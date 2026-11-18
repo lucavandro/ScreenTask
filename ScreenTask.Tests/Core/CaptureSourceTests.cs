@@ -10,7 +10,7 @@ namespace ScreenTask.Tests.Core
         [Fact]
         public void ScreenCaptureSource_ReturnsValidDisplayInfo()
         {
-            var source = new ScreenCaptureSource(0);
+            using var source = new ScreenCaptureSource(0);
 
             Assert.NotNull(source.Id);
             Assert.NotEmpty(source.DisplayName);
@@ -22,7 +22,7 @@ namespace ScreenTask.Tests.Core
         [Fact]
         public void ScreenCaptureSource_CaptureFrame_ReturnsBitmapMatchingBounds()
         {
-            var source = new ScreenCaptureSource(0);
+            using var source = new ScreenCaptureSource(0);
             using var frame = source.CaptureFrame(false);
 
             if (frame != null)

@@ -69,6 +69,7 @@ namespace ScreenTask
         public frmMain()
         {
             InitializeComponent();
+            statusStripMain.ShowItemToolTips = true;
 
             // Prevent pre-autoscale MaxWindowTrackSize clamping on 96-DPI displays (e.g., 1024x768 or 1366x768)
             // from double-shrinking ClientSize when Designer coordinates are stored at 150% DPI (10x25).
@@ -1189,6 +1190,7 @@ namespace ScreenTask
 
             monitorPreview.FpsText = $"{fps}.0 FPS";
             statusLabelFps.Text = $"{fps} FPS";
+            statusLabelFps.ToolTipText = $"Capture: {_captureEngine.CaptureBackend} ({_captureEngine.LastCaptureMilliseconds:0.0} ms) | Encode: {_broadcaster.LastEncodeMilliseconds:0.0} ms";
             statusLabelData.Text = $"{mbTransferred} MB";
             statusLabelUptime.Text = uptime;
             statusLabelViewers.Text = $"{viewers} {(viewers == 1 ? "viewer" : "viewers")}";

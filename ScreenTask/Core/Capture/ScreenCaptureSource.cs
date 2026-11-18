@@ -8,6 +8,13 @@ namespace ScreenTask.Core.Capture
     public class ScreenCaptureSource : ICaptureSource
     {
         private readonly int _screenIndex;
+        private readonly bool _useDesktopDuplication;
+        private readonly Func<string, Size, DesktopDuplicationCapture> _duplicationFactory;
+        private readonly object _captureLock = new();
+        private DesktopDuplicationCapture? _desktopDuplication;
+        private Rectangle _duplicationBounds;
+        private long _gpuRetryAfter;
+        public string CaptureBackend { get; private set; } = "GDI";
 
         [StructLayout(LayoutKind.Sequential)]
         private struct CURSORINFO
@@ -34,9 +41,23 @@ namespace ScreenTask.Core.Capture
         private const int CURSOR_SHOWING = 0x0001;
         private const int DI_NORMAL = 0x0003;
 
-        public ScreenCaptureSource(int screenIndex = 0)
+        public ScreenCaptureSource(int screenIndex = 0, bool useDesktopDuplication = true)
         {
             _screenIndex = screenIndex;
+            _useDesktopDuplication = useDesktopDuplication;
+            _duplicationFactory = (name, size) => new DesktopDuplicationCapture(name, size);
+        }
+
+        internal ScreenCaptureSource(int screenIndex, Func<string, Size, DesktopDuplicationCapture> duplicationFactory)
+            : this(screenIndex)
+        {
+            _duplicationFactory = duplicationFactory;
+        }
+
+        internal Bitmap? CapturePreviewFrame(bool captureCursor)
+        {
+            // On-demand thumbnails must not retain extra GPU duplication sessions.
+            lock (_captureLock) return CaptureGdiFrame(captureCursor);
         }
 
         public string Id => $"Screen_{_screenIndex}";
@@ -81,6 +102,52 @@ namespace ScreenTask.Core.Capture
         public bool IsValid => true;
 
         public Bitmap? CaptureFrame(bool captureCursor)
+        {
+            lock (_captureLock)
+            {
+                var bounds = Bounds;
+                if (_useDesktopDuplication && Environment.TickCount64 >= _gpuRetryAfter)
+                {
+                    try
+                    {
+                        if (_desktopDuplication != null && _duplicationBounds != bounds)
+                        {
+                            _desktopDuplication.Dispose();
+                            _desktopDuplication = null;
+                        }
+                        if (_desktopDuplication == null)
+                        {
+                            var screens = Screen.AllScreens;
+                            var screen = _screenIndex >= 0 && _screenIndex < screens.Length ? screens[_screenIndex] : Screen.PrimaryScreen;
+                            if (screen == null) return null;
+                            _desktopDuplication = _duplicationFactory(screen.DeviceName, bounds.Size);
+                            _duplicationBounds = bounds;
+                        }
+                        var frame = _desktopDuplication.CaptureFrame();
+                        if (frame != null)
+                        {
+                            if (captureCursor && _desktopDuplication.DrawCursorSeparately)
+                            {
+                                using var graphics = Graphics.FromImage(frame);
+                                DrawCursor(graphics, bounds);
+                            }
+                            CaptureBackend = "DXGI";
+                            return frame;
+                        }
+                    }
+                    catch
+                    {
+                        _desktopDuplication?.Dispose();
+                        _desktopDuplication = null;
+                        _gpuRetryAfter = Environment.TickCount64 + 2000;
+                    }
+                }
+                CaptureBackend = "GDI";
+                return CaptureGdiFrame(captureCursor);
+            }
+        }
+
+        private Bitmap? CaptureGdiFrame(bool captureCursor)
         {
             var bounds = Bounds;
             if (bounds.Width <= 0 || bounds.Height <= 0)
@@ -148,7 +215,13 @@ namespace ScreenTask.Core.Capture
 
         public void Dispose()
         {
-            // Nothing unmanaged to dispose
+            lock (_captureLock)
+            {
+                _desktopDuplication?.Dispose();
+                _desktopDuplication = null;
+                _gpuRetryAfter = 0;
+                CaptureBackend = "GDI";
+            }
         }
     }
 }

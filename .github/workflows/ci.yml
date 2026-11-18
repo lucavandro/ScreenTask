@@ -44,5 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ScreenTask-v2.0-win-x64
-          path: publish/win-x64/ScreenTask.exe
+          path: |
+            publish/win-x64/ScreenTask.exe
+            publish/win-x64/DirectX-NOTICE.txt
           if-no-files-found: error

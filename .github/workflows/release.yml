@@ -50,13 +50,14 @@ jobs:
             -o publish/standalone
 
           Copy-Item "publish/standalone/ScreenTask.exe" "dist/ScreenTask-$tag-win-x64-standalone.exe"
+          Copy-Item "publish/standalone/DirectX-NOTICE.txt" "dist/DirectX-NOTICE.txt"
 
           # 2. Lightweight Framework-Dependent Single-File ZIP (Requires .NET 9 Desktop Runtime)
           dotnet publish ScreenTask/ScreenTask.csproj -c Release -r win-x64 --self-contained false `
             -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false `
             -o publish/fxdependent
 
-          Compress-Archive -Path "publish/fxdependent/ScreenTask.exe", "README.md" `
+          Compress-Archive -Path "publish/fxdependent/ScreenTask.exe", "publish/fxdependent/DirectX-NOTICE.txt", "README.md" `
             -DestinationPath "dist/ScreenTask-$tag-win-x64-portable.zip" -Force
 
           # 3. Generate SHA-256 Checksums
@@ -86,3 +87,4 @@ jobs:
             dist/ScreenTask-*-win-x64-standalone.exe
             dist/ScreenTask-*-win-x64-portable.zip
             dist/SHA256SUMS.txt
+            dist/DirectX-NOTICE.txt

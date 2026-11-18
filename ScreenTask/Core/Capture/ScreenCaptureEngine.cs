@@ -16,6 +16,10 @@ namespace ScreenTask.Core.Capture
         private CancellationTokenSource? _cts;
         private Task? _captureTask;
 
+        private double _lastCaptureMilliseconds;
+        public double LastCaptureMilliseconds => Volatile.Read(ref _lastCaptureMilliseconds);
+        public string CaptureBackend => CurrentSource is ScreenCaptureSource screen ? screen.CaptureBackend : "PrintWindow";
+
         public ICaptureSource CurrentSource { get; private set; }
         public bool CaptureMouse { get; set; } = true;
         public int TargetFps { get; set; } = 30;
@@ -187,7 +191,9 @@ namespace ScreenTask.Core.Capture
                     }
                     else
                     {
+                        long captureStarted = Stopwatch.GetTimestamp();
                         var frame = CurrentSource.CaptureFrame(CaptureMouse);
+                        Volatile.Write(ref _lastCaptureMilliseconds, Stopwatch.GetElapsedTime(captureStarted).TotalMilliseconds);
                         if (frame != null)
                         {
                             frameToBroadcast = frame;

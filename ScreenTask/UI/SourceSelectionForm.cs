@@ -390,7 +390,9 @@ namespace ScreenTask.UI
         {
             try
             {
-                using var frame = source.CaptureFrame(captureCursor: false);
+                using var frame = source is ScreenCaptureSource screen
+                    ? screen.CapturePreviewFrame(captureCursor: false)
+                    : source.CaptureFrame(captureCursor: false);
                 if (frame == null) return null;
 
                 var thumb = new Bitmap(maxWidth, maxHeight);

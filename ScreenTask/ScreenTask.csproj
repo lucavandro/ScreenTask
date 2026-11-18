@@ -27,12 +27,14 @@
   <ItemGroup>
     <PackageReference Include="NAudio.Wasapi" Version="3.1.0" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="WebServer\**" />
     <Content Include="file_icon.ico" />
     <Content Include="screenicon.ico" />
+    <None Update="DirectX-NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
 </Project>
