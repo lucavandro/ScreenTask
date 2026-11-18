@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Diagnostics;
 using System.IO;
 using System.Net.WebSockets;
 using System.Threading;
@@ -15,6 +16,9 @@ namespace ScreenTask.Core.Streaming
         private readonly ConcurrentDictionary<string, (WebSocket Socket, SemaphoreSlim Lock)> _audioClients = new();
         private readonly ConcurrentDictionary<string, ViewerSession> _sessions = new();
         private readonly ImageCodecInfo _jpegEncoder;
+        private double _lastEncodeMilliseconds;
+        public double LastEncodeMilliseconds => Volatile.Read(ref _lastEncodeMilliseconds);
+
         private EncoderParameters _encoderParams;
         private long _frameCounter;
         private long _totalBytesTransferred;
@@ -23,7 +27,9 @@ namespace ScreenTask.Core.Streaming
         private int _currentFps;
         private int _fpsCounter;
         private long _lastFpsTimestamp;
-        private byte[] _latestJpegSnapshot = Array.Empty<byte>();
+        private byte[] _latestVideoPacket = Array.Empty<byte>();
+        private byte[]? _latestJpegSnapshot;
+        private readonly object _encoderLock = new();
         private readonly object _snapshotLock = new();
         private byte[]? _latestAudioFormatPacket;
         private readonly object _audioFormatLock = new();
@@ -74,13 +80,18 @@ namespace ScreenTask.Core.Streaming
         public StreamBroadcaster(int initialQuality = 75)
         {
             _jpegEncoder = GetEncoder(ImageFormat.Jpeg) ?? throw new InvalidOperationException("JPEG encoder not found");
-            _encoderParams = CreateEncoderParams(initialQuality);
+            _encoderParams = CreateEncoderParams(Math.Clamp(initialQuality, 10, 100));
             _lastFpsTimestamp = Environment.TickCount64;
         }
 
         public void SetQuality(int quality)
         {
-            _encoderParams = CreateEncoderParams(Math.Clamp(quality, 10, 100));
+            lock (_encoderLock)
+            {
+                var previous = _encoderParams;
+                _encoderParams = CreateEncoderParams(Math.Clamp(quality, 10, 100));
+                previous.Dispose();
+            }
         }
 
         private static EncoderParameters CreateEncoderParams(int quality)
@@ -115,7 +126,7 @@ namespace ScreenTask.Core.Streaming
         {
             if (_videoClients.TryRemove(id, out var entry))
             {
-                entry.Lock.Dispose();
+                // SemaphoreSlim has no wait handle here; let in-flight operations release it before GC.
             }
             if (_sessions.TryRemove(id, out _))
             {
@@ -168,80 +179,51 @@ namespace ScreenTask.Core.Streaming
         {
             if (_audioClients.TryRemove(id, out var entry))
             {
-                entry.Lock.Dispose();
+                // SemaphoreSlim has no wait handle here; let in-flight operations release it before GC.
             }
         }
 
         public async Task KickAllClientsAsync(WebSocketCloseStatus closeStatus, string reason)
         {
-            var kickTasks = new List<Task>();
-
-            foreach (var kvp in _videoClients)
-            {
-                var socket = kvp.Value.Socket;
-                if (socket.State == WebSocketState.Open)
-                {
-                    kickTasks.Add(Task.Run(async () =>
-                    {
-                        try { await socket.CloseAsync(closeStatus, reason, CancellationToken.None); } catch { }
-                    }));
-                }
-            }
-
-            foreach (var kvp in _audioClients)
-            {
-                var socket = kvp.Value.Socket;
-                if (socket.State == WebSocketState.Open)
-                {
-                    kickTasks.Add(Task.Run(async () =>
-                    {
-                        try { await socket.CloseAsync(closeStatus, reason, CancellationToken.None); } catch { }
-                    }));
-                }
-            }
-
-            await Task.WhenAll(kickTasks);
-            _videoClients.Clear();
-            _audioClients.Clear();
-            var sessionIds = _sessions.Keys.ToArray();
-            _sessions.Clear();
-            foreach (var id in sessionIds)
-            {
-                SessionDisconnected?.Invoke(id);
-            }
+            var clients = _videoClients.ToArray();
+            var audioClients = _audioClients.ToArray();
+            foreach (var client in clients) RemoveVideoClient(client.Key);
+            foreach (var client in audioClients) RemoveAudioClient(client.Key);
+            await Task.WhenAll(clients.Select(c => CloseClientAsync(c.Value, closeStatus, reason))
+                .Concat(audioClients.Select(c => CloseClientAsync(c.Value, closeStatus, reason))));
         }
 
         public async Task KickClientAsync(string id, WebSocketCloseStatus closeStatus = WebSocketCloseStatus.NormalClosure, string reason = "Kicked by host")
         {
-            if (_videoClients.TryRemove(id, out var videoEntry))
-            {
-                try
-                {
-                    if (videoEntry.Socket.State == WebSocketState.Open)
-                    {
-                        await videoEntry.Socket.CloseAsync(closeStatus, reason, CancellationToken.None);
-                    }
-                }
-                catch { }
-                videoEntry.Lock.Dispose();
-            }
+            _videoClients.TryGetValue(id, out var videoEntry);
+            _audioClients.TryGetValue(id, out var audioEntry);
+            RemoveVideoClient(id);
+            RemoveAudioClient(id);
+            var tasks = new List<Task>();
+            if (videoEntry.Socket != null) tasks.Add(CloseClientAsync(videoEntry, closeStatus, reason));
+            if (audioEntry.Socket != null) tasks.Add(CloseClientAsync(audioEntry, closeStatus, reason));
+            await Task.WhenAll(tasks);
+        }
 
-            if (_audioClients.TryRemove(id, out var audioEntry))
+        private static async Task CloseClientAsync((WebSocket Socket, SemaphoreSlim Lock) client, WebSocketCloseStatus closeStatus, string reason)
+        {
+            bool acquired = false;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            try
             {
-                try
-                {
-                    if (audioEntry.Socket.State == WebSocketState.Open)
-                    {
-                        await audioEntry.Socket.CloseAsync(closeStatus, reason, CancellationToken.None);
-                    }
-                }
-                catch { }
-                audioEntry.Lock.Dispose();
+                // Close frames share the socket's send path with video, audio and pong.
+                await client.Lock.WaitAsync(timeout.Token);
+                acquired = true;
+                if (client.Socket.State == WebSocketState.Open)
+                    await client.Socket.CloseAsync(closeStatus, reason, timeout.Token);
             }
-
-            if (_sessions.TryRemove(id, out _))
+            catch
             {
-                SessionDisconnected?.Invoke(id);
+                try { client.Socket.Abort(); } catch { }
+            }
+            finally
+            {
+                if (acquired) client.Lock.Release();
             }
         }
 
@@ -254,7 +236,6 @@ namespace ScreenTask.Core.Streaming
             packet[0] = 0x04; // Broadcast announcement packet type
             Buffer.BlockCopy(msgBytes, 0, packet, 1, msgBytes.Length);
 
-            Interlocked.Add(ref _totalBytesTransferred, packet.Length * _videoClients.Count);
 
             var sendTasks = new List<Task>();
             foreach (var kvp in _videoClients)
@@ -294,32 +275,29 @@ namespace ScreenTask.Core.Streaming
         {
             lock (_snapshotLock)
             {
-                return _latestJpegSnapshot;
+                if (_latestVideoPacket.Length == 0) return Array.Empty<byte>();
+                return _latestJpegSnapshot ??= _latestVideoPacket.AsSpan(1).ToArray();
             }
         }
 
-        public async Task BroadcastBitmapAsync(Bitmap bitmap)
+        public Task BroadcastBitmapAsync(Bitmap bitmap)
         {
-            if (bitmap == null) return;
+            if (bitmap == null) return Task.CompletedTask;
+            long encodeStarted = Stopwatch.GetTimestamp();
 
-            using var stream = new PooledBufferWriterStream(64 * 1024);
-            // Reserve byte 0 for video packet header (0x01)
-            stream.Position = 1;
-            bitmap.Save(stream, _jpegEncoder, _encoderParams);
-
-            int totalLength = (int)stream.Length;
-            int jpegLength = totalLength - 1;
-            if (jpegLength <= 0) return;
-
-            // Stamp 0x01 video frame type at byte 0
-            stream.Buffer[0] = 0x01;
-
-            // Cache snapshot for REST endpoint /api/status or /preview
-            var snapshot = new byte[jpegLength];
-            Buffer.BlockCopy(stream.Buffer, 1, snapshot, 0, jpegLength);
+            // Snapshot the client collection so connecting/disconnecting viewers
+            // cannot change the audience while this immutable JPEG is encoded.
+            var clients = _videoClients.ToArray();
+            byte[] packet;
+            lock (_encoderLock)
+            {
+                packet = EncodeJpegPacket(bitmap);
+            }
+            Volatile.Write(ref _lastEncodeMilliseconds, Stopwatch.GetElapsedTime(encodeStarted).TotalMilliseconds);
             lock (_snapshotLock)
             {
-                _latestJpegSnapshot = snapshot;
+                _latestVideoPacket = packet;
+                _latestJpegSnapshot = null; // Materialize the header-free JPEG only on request.
             }
 
             Interlocked.Increment(ref _frameCounter);
@@ -334,20 +312,23 @@ namespace ScreenTask.Core.Streaming
                 _lastFpsTimestamp = now;
             }
 
-            if (_videoClients.IsEmpty) return;
-
-            var packetSegment = new ArraySegment<byte>(stream.Buffer, 0, totalLength);
-            Interlocked.Add(ref _totalBytesTransferred, (long)totalLength * _videoClients.Count);
-
-            // Broadcast concurrently to all connected video clients
-            var sendTasks = new Task[_videoClients.Count];
-            int i = 0;
-            foreach (var kvp in _videoClients)
+            // Each client has at most one send in flight. Busy clients skip this frame;
+            // capture and fast viewers never wait for a slow network connection.
+            foreach (var kvp in clients)
             {
-                sendTasks[i++] = SendToClientAsync(kvp.Key, kvp.Value.Socket, kvp.Value.Lock, packetSegment, isAudio: false);
+                _ = SendToClientAsync(kvp.Key, kvp.Value.Socket, kvp.Value.Lock, packet, isAudio: false);
             }
+            return Task.CompletedTask;
+        }
 
-            await Task.WhenAll(sendTasks);
+        // Caller holds _encoderLock.
+        private byte[] EncodeJpegPacket(Bitmap bitmap)
+        {
+            using var stream = new PooledBufferWriterStream(64 * 1024);
+            stream.Position = 1;
+            bitmap.Save(stream, _jpegEncoder, _encoderParams);
+            stream.Buffer[0] = 0x01;
+            return stream.WrittenSpan.ToArray();
         }
 
         public async Task BroadcastAudioChunkAsync(byte[] audioPcm)
@@ -363,7 +344,6 @@ namespace ScreenTask.Core.Streaming
             packet[0] = 0x02; // Audio chunk type
             Buffer.BlockCopy(audioPcm, 0, packet, 1, audioPcm.Length);
 
-            Interlocked.Add(ref _totalBytesTransferred, packet.Length * targetClients.Count);
 
             var sendTasks = new List<Task>(targetClients.Count);
             foreach (var kvp in targetClients)
@@ -420,6 +400,7 @@ namespace ScreenTask.Core.Streaming
             // Drop-frame protection:
             // For video: if previous video frame is still sending, drop the new video frame to maintain real-time sync.
             // For audio: audio packets are small (1KB). A small 50ms wait ensures audio packets are never dropped due to transient lock contention.
+            bool isVideoFrame = !isAudio && data.Count > 0 && data.Array?[data.Offset] == 0x01;
             if (isAudio)
             {
                 if (!await clientLock.WaitAsync(50)) return;
@@ -428,18 +409,21 @@ namespace ScreenTask.Core.Streaming
             {
                 if (!clientLock.Wait(0))
                 {
-                    Interlocked.Increment(ref _totalFramesDropped);
+                    if (isVideoFrame) Interlocked.Increment(ref _totalFramesDropped);
                     return;
                 }
-                Interlocked.Increment(ref _totalFramesSent);
             }
 
             try
             {
-                await socket.SendAsync(data, WebSocketMessageType.Binary, true, CancellationToken.None);
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                await socket.SendAsync(data, WebSocketMessageType.Binary, true, timeout.Token);
+                Interlocked.Add(ref _totalBytesTransferred, data.Count);
+                if (isVideoFrame) Interlocked.Increment(ref _totalFramesSent);
             }
             catch (Exception)
             {
+                try { socket.Abort(); } catch { }
                 if (isAudio) RemoveAudioClient(clientId);
                 else RemoveVideoClient(clientId);
             }
@@ -469,7 +453,7 @@ namespace ScreenTask.Core.Streaming
                 try
                 {
                     if (kvp.Value.Socket.State == WebSocketState.Open) kvp.Value.Socket.Abort();
-                    kvp.Value.Lock.Dispose();
+                    // In-flight operations retain the managed semaphore until completion.
                 }
                 catch { }
             }
@@ -480,7 +464,7 @@ namespace ScreenTask.Core.Streaming
                 try
                 {
                     if (kvp.Value.Socket.State == WebSocketState.Open) kvp.Value.Socket.Abort();
-                    kvp.Value.Lock.Dispose();
+                    // In-flight operations retain the managed semaphore until completion.
                 }
                 catch { }
             }

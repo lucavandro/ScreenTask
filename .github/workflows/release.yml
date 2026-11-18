@@ -27,7 +27,9 @@ jobs:
         run: dotnet restore
 
       - name: Verify JavaScript syntax (Web Viewer)
-        run: node -c ScreenTask/WebServer/viewer.js
+        run: |
+          node -c ScreenTask/WebServer/viewer.js
+          node --test ScreenTask.Tests/Web/viewer-decoder.test.cjs
 
       - name: Build & Run Automated Test Suite
         run: |

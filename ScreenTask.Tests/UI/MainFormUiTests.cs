@@ -21,7 +21,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
 
                 Assert.NotNull(form);
                 Assert.Contains("ScreenTask 2.0", form.Text);
@@ -98,7 +98,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
 
                 var comboScreens = FindControl<ComboBox>(form, "comboScreens");
@@ -130,7 +130,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
 
                 Assert.NotNull(form.picPairingQr);
@@ -144,7 +144,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
 
                 var cbAudio = FindControl<CheckBox>(form, "cbAudio");
@@ -189,7 +189,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
                 form.SelectTab(2);
 
@@ -206,7 +206,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
 
                 Assert.Equal(0, form.SelectedTabIndex);
@@ -227,7 +227,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
                 form.SelectTab(1);
 
@@ -294,7 +294,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
 
                 var monitor = FindControl<Control>(form, "monitorPreview");
@@ -316,7 +316,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
 
                 var cbPrivate = FindControl<CheckBox>(form, "cbPrivate");
@@ -340,7 +340,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
 
                 var statusStrip = form.StatusStrip;
@@ -416,7 +416,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
 
                 var menuStrip = FindControl<MenuStrip>(form, "menuStripMain");
@@ -510,7 +510,7 @@ namespace ScreenTask.Tests.UI
                 string tempSettingsFile = Path.Combine(Path.GetTempPath(), $"screentask_test_settings_{Guid.NewGuid():N}.xml");
                 try
                 {
-                    using (var form1 = new frmMain())
+                    using (var form1 = CreateIsolatedForm())
                     {
                         form1.CustomSettingsFilePath = tempSettingsFile;
                         form1.Show();
@@ -532,7 +532,7 @@ namespace ScreenTask.Tests.UI
 
                     Assert.True(File.Exists(tempSettingsFile), "Settings file must exist after SaveSettings.");
 
-                    using (var form2 = new frmMain())
+                    using (var form2 = CreateIsolatedForm())
                     {
                         form2.CustomSettingsFilePath = tempSettingsFile;
                         form2.Show();
@@ -563,7 +563,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.SuppressModalDialogsForTesting = true;
                 form.Show();
 
@@ -599,7 +599,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                var form = new frmMain();
+                var form = CreateIsolatedForm();
                 form.SuppressModalDialogsForTesting = true;
                 form.cbCloseToTray.Checked = false;
                 form.Show();
@@ -639,7 +639,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var form = new frmMain();
+                using var form = CreateIsolatedForm();
                 form.Show();
 
                 Assert.NotNull(form.btnPopout);
@@ -658,7 +658,7 @@ namespace ScreenTask.Tests.UI
         {
             RunInSta(() =>
             {
-                using var mainForm = new frmMain();
+                using var mainForm = CreateIsolatedForm();
                 mainForm.Show();
                 mainForm.Log("Sample diagnostic log entry");
                 Application.DoEvents();
@@ -739,11 +739,22 @@ namespace ScreenTask.Tests.UI
             Assert.True(v201 > v2Semantic);
         }
 
+        [ThreadStatic]
+        private static List<string>? _testSettingsFiles;
+
+        private static frmMain CreateIsolatedForm()
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"screentask_ui_{Guid.NewGuid():N}.xml");
+            _testSettingsFiles?.Add(path);
+            return new frmMain { CustomSettingsFilePath = path };
+        }
+
         private static void RunInSta(Action action)
         {
             Exception? ex = null;
             var thread = new Thread(() =>
             {
+                _testSettingsFiles = new List<string>();
                 try
                 {
                     action();
@@ -751,6 +762,14 @@ namespace ScreenTask.Tests.UI
                 catch (Exception e)
                 {
                     ex = e;
+                }
+                finally
+                {
+                    foreach (var path in _testSettingsFiles)
+                    {
+                        try { File.Delete(path); } catch { }
+                    }
+                    _testSettingsFiles = null;
                 }
             });
             thread.SetApartmentState(ApartmentState.STA);

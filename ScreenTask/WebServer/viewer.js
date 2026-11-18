@@ -350,8 +350,55 @@
     telemetryInterval = null;
   }
 
+  // Bound decoding work: one active decode and only the newest waiting frame.
+  let pendingVideoFrame = null;
+  let isDecodingVideo = false;
+  let videoGeneration = 0;
+
+  function resetVideoDecoder() {
+    videoGeneration++;
+    pendingVideoFrame = null;
+  }
+
+  async function decodeVideoFrames() {
+    if (isDecodingVideo) return;
+    isDecodingVideo = true;
+    try {
+      while (pendingVideoFrame) {
+        const frame = pendingVideoFrame;
+        pendingVideoFrame = null;
+        let bitmap = null;
+        try {
+          bitmap = await createImageBitmap(new Blob([frame.bytes], { type: 'image/jpeg' }));
+          if (frame.generation !== videoGeneration) continue;
+          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            resolutionDisplay.textContent = `${bitmap.width}x${bitmap.height}`;
+          }
+          ctx.drawImage(bitmap, 0, 0);
+          frameCount++;
+          const now = performance.now();
+          if (now - lastFpsTime >= 1000) {
+            currentFps = frameCount;
+            frameCount = 0;
+            lastFpsTime = now;
+            fpsDisplay.textContent = `${currentFps} FPS`;
+          }
+        } catch (err) {
+          // A failed decode must not block following frames.
+        } finally {
+          if (bitmap) bitmap.close();
+        }
+      }
+    } finally {
+      isDecodingVideo = false;
+    }
+  }
+
   // Connect WebSockets (Video + Audio)
   function connect() {
+    resetVideoDecoder();
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const pinParam = pin ? `?pin=${encodeURIComponent(pin)}` : '';
     const videoWsUrl = `${protocol}//${location.host}/stream/ws${pinParam}`;
@@ -378,7 +425,9 @@
       startTelemetryHeartbeat();
     };
 
-    wsVideo.onmessage = async (event) => {
+    const videoSocket = wsVideo;
+    wsVideo.onmessage = (event) => {
+      if (wsVideo !== videoSocket) return;
       // Handle text messages (ping/pong and telemetry)
       if (typeof event.data === 'string') {
         try {
@@ -401,31 +450,10 @@
 
       const packetType = data[0];
 
-      // 0x01 = Video Frame (JPEG)
+      // 0x01 = Video frame (JPEG)
       if (packetType === 0x01) {
-        const frameBytes = data.subarray(1);
-        const blob = new Blob([frameBytes], { type: 'image/jpeg' });
-        try {
-          const bitmap = await createImageBitmap(blob);
-          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
-            canvas.width = bitmap.width;
-            canvas.height = bitmap.height;
-            resolutionDisplay.textContent = `${bitmap.width}x${bitmap.height}`;
-          }
-          ctx.drawImage(bitmap, 0, 0);
-          bitmap.close();
-
-          frameCount++;
-          const now = performance.now();
-          if (now - lastFpsTime >= 1000) {
-            currentFps = frameCount;
-            frameCount = 0;
-            lastFpsTime = now;
-            fpsDisplay.textContent = `${currentFps} FPS`;
-          }
-        } catch (err) {
-          // Ignore transient decode errors
-        }
+        pendingVideoFrame = { bytes: data.subarray(1), generation: videoGeneration };
+        void decodeVideoFrames();
       }
       // Fallback: 0x02 = Audio PCM Chunk (for single-channel compatibility)
       else if (packetType === 0x02) {
@@ -450,6 +478,8 @@
     };
 
     wsVideo.onclose = (e) => {
+      if (wsVideo !== videoSocket) return;
+      resetVideoDecoder();
       isConnected = false;
       stopTelemetryHeartbeat();
       if (wsAudio) {
@@ -470,7 +500,7 @@
     };
 
     wsVideo.onerror = () => {
-      try { wsVideo.close(); } catch (e) {}
+      try { videoSocket.close(); } catch (e) {}
     };
   }
 
