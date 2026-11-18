@@ -314,17 +314,6 @@ body.simulated-fullscreen {
   background: #000 !important;
 }
 
-body.simulated-fullscreen header {
-  display: none !important;
-}
-
-body.simulated-fullscreen .viewer-wrap {
-  width: 100vw !important;
-  height: 100dvh !important;
-  position: fixed !important;
-  inset: 0 !important;
-}
-
 /* Error / Stopped State */
 .overlay-message {
   position: absolute;
