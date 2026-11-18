@@ -34,6 +34,18 @@ Sources:
 - [Microsoft: .NET 9 WinForms dark mode](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/whats-new/net90#dark-mode)
 - [Microsoft: SetColorMode limitations](https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.application.setcolormode)
 
+## Application icon
+
+`ScreenTask/Assets/ScreenTask.png` is the generated master. `ScreenTask.ico`
+contains 16, 20, 24, 32, 40, 48, 64, 128 and 256-pixel frames. Every frame is
+fully opaque, with a filled monitor and broadcast mark on a muted blue tile.
+The executable, main window and notification-area icon use the same ICO.
+The original legacy ICO files are retained.
+
+Created with the built-in **imagegen** tool. Final generation prompt:
+
+> Use case: logo-brand. Create one finished square Windows desktop application icon for ScreenTask, an offline local-network screen-sharing app. A simple filled computer monitor with a small three-arc broadcast mark integrated into its screen, bold enough to recognize at 16 pixels. Flat precise modern geometric shapes, front view, centered, generous but not excessive margins. Opaque muted medium blue square tile background covering the entire canvas edge to edge, pale cool ivory filled monitor silhouette, a darker slate-blue inset display and pale blue broadcast mark. Restrained soft contrast, solid fills, very few details, thick clean silhouette. Must remain clearly visible on both dark and light Windows taskbars, without depending on background transparency. No letters, no words, no numbers, no glass, no transparency, no tiny strokes, no 3D perspective, no glows, no mockup, no extra backdrop outside the icon tile. Asset is the icon itself, not a presentation of an icon. High resolution square PNG.
+
 ## Verification
 
 - Release build: zero warnings/errors.
