@@ -18,7 +18,8 @@ Extract all ZIP contents into a folder before starting `ScreenTask.exe`. Close
 any older running copy, including its notification-area instance. Do not copy
 only the executable when the package contains accompanying notices or files.
 
-For a smaller package that requires the matching .NET Desktop Runtime, change
+For a smaller package that requires the matching .NET 9 Desktop Runtime **and
+ASP.NET Core Runtime 9**, change
 `--self-contained true` to `--self-contained false` and omit
 `IncludeNativeLibrariesForSelfExtract`. The GitHub release workflow already
 publishes standalone and framework-dependent variants when an explicit `v*`
