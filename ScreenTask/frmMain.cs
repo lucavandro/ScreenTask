@@ -1190,7 +1190,7 @@ namespace ScreenTask
 
             monitorPreview.FpsText = $"{fps}.0 FPS";
             statusLabelFps.Text = $"{fps} FPS";
-            statusLabelFps.ToolTipText = $"Capture: {_captureEngine.CaptureBackend} ({_captureEngine.LastCaptureMilliseconds:0.0} ms) | Encode: {_broadcaster.LastEncodeMilliseconds:0.0} ms";
+            statusLabelFps.ToolTipText = $"Capture: {_captureEngine.CaptureBackend} ({_captureEngine.LastCaptureMilliseconds:0.0} ms) | Encode: {_broadcaster.LastEncodeMilliseconds:0.0} ms | Queue: {_captureEngine.LastQueueWaitMilliseconds:0.0} ms | Frame age (host): {_captureEngine.LastFrameAgeMilliseconds:0.0} ms";
             statusLabelData.Text = $"{mbTransferred} MB";
             statusLabelUptime.Text = uptime;
             statusLabelViewers.Text = $"{viewers} {(viewers == 1 ? "viewer" : "viewers")}";

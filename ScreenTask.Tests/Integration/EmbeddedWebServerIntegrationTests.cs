@@ -128,6 +128,11 @@ namespace ScreenTask.Tests.Integration
             Assert.Equal("2.0.0", root.GetProperty("version").GetString());
             Assert.True(root.TryGetProperty("viewers", out _));
             Assert.True(root.TryGetProperty("fps", out _));
+            Assert.InRange(root.GetProperty("pendingFrames").GetInt32(), 0, 1);
+            Assert.True(root.GetProperty("droppedCapturedFrames").GetInt64() >= 0);
+            Assert.True(root.GetProperty("frameAgeMilliseconds").GetDouble() >= 0);
+            Assert.True(root.GetProperty("queueWaitMilliseconds").GetDouble() >= 0);
+            Assert.False(root.GetProperty("frozen").GetBoolean());
         }
 
         [Fact]
