@@ -151,6 +151,7 @@
     if (audioGain) {
       audioGain.gain.value = isAudioMuted ? 0 : currentVol;
     }
+    btnAudio?.setAttribute('aria-pressed', String(!isAudioMuted));
 
     if (isAudioMuted) {
       if (btnAudio) {
@@ -224,15 +225,50 @@
     updateAudioBtn();
   });
 
+  // Dialog focus stays inside the active dialog and returns to its opener.
+  let audioDialogReturnFocus = null;
+
+  function closeAudioDiagnostics() {
+    audioDiagModal?.classList.add('hidden');
+    const target = fullscreenUiActive && !headerExpanded ? btnHeaderToggle : audioDialogReturnFocus;
+    target?.focus({ preventScroll: true });
+    resetToolbarHideTimer();
+  }
+
   btnAudioDiag?.addEventListener('click', () => {
+    audioDialogReturnFocus = btnAudioDiag;
     initAudio();
     audioDiagModal?.classList.remove('hidden');
     updateAudioInfoUi();
     updateAudioBtn();
+    btnCloseAudioDiag?.focus({ preventScroll: true });
   });
 
-  btnCloseAudioDiag?.addEventListener('click', () => {
-    audioDiagModal?.classList.add('hidden');
+  btnCloseAudioDiag?.addEventListener('click', closeAudioDiagnostics);
+  audioDiagModal?.addEventListener('click', (event) => {
+    if (event.target === audioDiagModal) closeAudioDiagnostics();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    const dialog = [pinModal, audioDiagModal].find(element => element && !element.classList.contains('hidden'));
+    if (!dialog) return;
+    if (event.key === 'Escape' && dialog === audioDiagModal) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeAudioDiagnostics();
+    } else if (event.key === 'Tab') {
+      const controls = [...dialog.querySelectorAll('button, input, [tabindex="0"]')]
+        .filter(element => !element.disabled && element.getClientRects().length > 0);
+      if (!controls.length) return;
+      const first = controls[0], last = controls[controls.length - 1];
+      if (!dialog.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
   });
 
   btnPlayChime?.addEventListener('click', () => {
@@ -704,6 +740,7 @@
       btnHeaderToggle.setAttribute('aria-label', headerExpanded ? 'Hide controls' : 'Show controls');
       btnHeaderToggle.title = headerExpanded ? 'Hide controls (H)' : 'Show controls (H)';
     }
+    updateViewerControls();
   }
 
   function updateFullscreenBtn(isFullscreen) {
@@ -720,7 +757,7 @@
       btnFullscreen.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>`;
       btnFullscreen.title = 'Exit fullscreen';
     } else {
-      btnFullscreen.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 2 2h3"></path></svg>`;
+      btnFullscreen.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>`;
       btnFullscreen.title = 'Enter fullscreen';
     }
     btnFullscreen.setAttribute('aria-label', btnFullscreen.title);
@@ -766,18 +803,23 @@
   }
 
   btnFullscreen?.addEventListener('click', toggleFullscreen);
-  btnHeaderToggle?.addEventListener('click', () => setHeaderExpanded(!headerExpanded));
+  btnHeaderToggle?.addEventListener('click', (event) => {
+    setHeaderExpanded(!headerExpanded);
+    if (headerExpanded && event?.detail === 0) btnFullscreen?.focus({ preventScroll: true });
+  });
 
   document.addEventListener('keydown', (event) => {
-    if (!fullscreenUiActive || event.ctrlKey || event.altKey || event.metaKey || event.repeat ||
-        event.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+    if (!fullscreenUiActive || event.ctrlKey || event.altKey || event.metaKey || event.repeat) return;
+    if (event.key === 'Escape' && isSimulatedFullscreen) {
+      event.preventDefault();
+      exitSimulatedFullscreen();
+      return;
+    }
+    if (event.target?.closest?.('[role="dialog"], input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
     if (event.key.toLowerCase() === 'h') {
       event.preventDefault();
       setHeaderExpanded(!headerExpanded);
-      btnHeaderToggle?.focus({ preventScroll: true });
-    } else if (event.key === 'Escape' && isSimulatedFullscreen) {
-      event.preventDefault();
-      exitSimulatedFullscreen();
+      (headerExpanded ? btnFullscreen : btnHeaderToggle)?.focus({ preventScroll: true });
     }
   });
 
@@ -788,31 +830,42 @@
     updateFullscreenBtn(isViewerFullscreen());
   });
 
-  // Auto-Hiding Floating Toolbar on Mobile & Fullscreen
+  // Fullscreen control visibility and idle timer
   const toolbar = document.querySelector('.floating-toolbar');
   let toolbarHideTimeout = null;
+  let controlsHovered = false;
 
-  function showToolbar() {
-    if (!toolbar) return;
-    toolbar.classList.remove('autohide');
+  function updateViewerControls() {
+    const hidden = fullscreenUiActive && !headerExpanded;
+    if (hidden && toolbar?.contains(document.activeElement)) btnHeaderToggle?.focus({ preventScroll: true });
+    if (toolbar) toolbar.hidden = hidden;
     resetToolbarHideTimer();
   }
 
   function resetToolbarHideTimer() {
     clearTimeout(toolbarHideTimeout);
+    if (!fullscreenUiActive || !headerExpanded) return;
     toolbarHideTimeout = setTimeout(() => {
       if (!audioDiagModal?.classList.contains('hidden') || !pinModal?.classList.contains('hidden')) return;
-      if (toolbar && (scale > 1 || window.innerWidth <= 768 || isSimulatedFullscreen || document.fullscreenElement)) {
-        toolbar.classList.add('autohide');
-      }
-    }, 3500);
+      if (controlsHovered || toolbar?.contains(document.activeElement) || viewerHeader?.contains(document.activeElement)) return;
+      setHeaderExpanded(false);
+    }, 5000);
   }
 
-  window.addEventListener('mousemove', showToolbar, { passive: true });
-  window.addEventListener('touchstart', showToolbar, { passive: true });
-  window.addEventListener('keydown', showToolbar, { passive: true });
-  toolbar?.addEventListener('mouseenter', () => clearTimeout(toolbarHideTimeout));
-  toolbar?.addEventListener('mouseleave', resetToolbarHideTimer);
+  // Pointer movement extends an already-open panel, without covering the stream again.
+  window.addEventListener('pointermove', () => { if (headerExpanded) resetToolbarHideTimer(); }, { passive: true });
+  window.addEventListener('keydown', () => { if (headerExpanded) resetToolbarHideTimer(); }, { passive: true });
+  for (const controls of [toolbar, viewerHeader]) {
+    controls?.addEventListener('mouseenter', () => {
+      if (window.matchMedia('(hover: hover)').matches) { controlsHovered = true; clearTimeout(toolbarHideTimeout); }
+    });
+    controls?.addEventListener('mouseleave', () => { controlsHovered = false; resetToolbarHideTimer(); });
+    controls?.addEventListener('focusin', () => clearTimeout(toolbarHideTimeout));
+    controls?.addEventListener('focusout', resetToolbarHideTimer);
+  }
+  for (const surface of [canvas, rtcVideo]) surface?.addEventListener('click', () => {
+    if (fullscreenUiActive && headerExpanded) setHeaderExpanded(false);
+  });
 
   // Touch Zoom & Pan Handlers
   function onVideoSurface(type, handler, options) {
@@ -939,6 +992,7 @@
     if (!enteredPin) return;
 
     if (pinError) pinError.style.display = 'none';
+    pinInput.setAttribute('aria-invalid', 'false');
     btnSubmitPin.disabled = true;
     btnSubmitPin.textContent = 'Verifying...';
 
@@ -955,8 +1009,10 @@
         pinModal.classList.add('hidden');
         btnSubmitPin.disabled = false;
         btnSubmitPin.textContent = 'Connect to Stream';
+        (fullscreenUiActive ? btnHeaderToggle : btnFullscreen)?.focus({ preventScroll: true });
         connect();
       } else {
+        pinInput.setAttribute('aria-invalid', 'true');
         if (pinError) {
           pinError.textContent = data.message || 'Incorrect PIN code. Please try again.';
           pinError.style.display = 'block';
@@ -981,6 +1037,7 @@
     resetWebRtc();
     isConnected = false;
     stopTelemetryHeartbeat();
+    audioDiagModal?.classList.add('hidden');
     if (wsVideo) {
       try { wsVideo.close(); } catch (e) {}
       wsVideo = null;
@@ -992,6 +1049,7 @@
     overlay.classList.add('hidden');
     pinModal.classList.remove('hidden');
     if (pinError) pinError.style.display = 'none';
+    pinInput.setAttribute('aria-invalid', 'false');
     pinInput.focus();
   }
 
@@ -1117,7 +1175,7 @@
   // Keyboard Shortcuts (F = Fullscreen, M = Mute, 0/Esc = Zoom Reset, +/- = Zoom, S = Screenshot)
   window.addEventListener('keydown', (e) => {
     const activeEl = document.activeElement;
-    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+    if (activeEl && (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName) || activeEl.isContentEditable || activeEl.closest?.('[role="dialog"]'))) {
       return;
     }
 

@@ -48,6 +48,7 @@ ScreenTask 2.0 is a ground-up modernization of the original 2015 utility:
 * 🔒 **Lock Screen & Sleep Resilience**: Handles Windows lock screen (`Win + L`) and desktop session switching gracefully without crashing or disconnecting viewers.
 * 🎨 **Next-Gen Mobile-First Web Viewer**: Redesigned with the Slate & Dynamic Indigo theme from [screentask.eslamx.com](https://screentask.eslamx.com/), featuring:
   * Fullscreen & mobile pinch-to-zoom (up to 5x) plus double-tap zoom for reading fine text and code on smartphones.
+  * [Collapsible fullscreen controls](docs/WEB_VIEWER.md), fitted stream content, touch-sized actions and keyboard navigation.
   * Web Audio API player with volume slider and mute controls.
   * Live stream HUD (FPS counter, resolution, RTT latency).
   * Clean 4-digit PIN authentication dialog.

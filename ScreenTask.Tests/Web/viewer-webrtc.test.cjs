@@ -87,7 +87,8 @@ test('PIN challenge tears down WebRTC even when the audio socket closes first', 
   Object.assign(s.context, {
     resetVideoDecoder() {}, stopTelemetryHeartbeat() {}, isConnected: true,
     wsAudio: null, overlay: { classList: { add() {} } }, pinModal: { classList: { remove() {} } },
-    pinError: { style: {} }, pinInput: { focus() {} }
+    pinError: { style: {} }, pinInput: { focus() {}, setAttribute() {} },
+    audioDiagModal: { classList: { add() {} } }
   });
   s.socket.close = () => {};
   vm.runInContext(source.slice(source.indexOf('  function showPinModal()'), source.indexOf('  async function checkServerStatus()')), s.context);
