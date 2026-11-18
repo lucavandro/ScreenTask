@@ -1,3 +1,22 @@
+# Collaboration and delivery requirements
+
+* Before acting on a request, confirm your understanding and offer relevant ideas or suggestions.
+* For every requested repository change, complete the implementation and appropriate checks,
+  create a separate Conventional Commit for that request, and push the commits to the configured
+  remote branch. Do this without asking again unless the user explicitly requests otherwise or
+  a real permission/protection constraint prevents it.
+* Keep independent requests in separate commits, including when several requests arrive together.
+  Include their relevant tests and documentation. If a later instruction supersedes an experiment,
+  commit the final accepted result and its evidence; do not restore discarded functionality merely
+  to reproduce intermediate chat states.
+* Preserve unrelated work. Inspect the branch, index, worktree and remote before committing;
+  never force-push or overwrite remote history to complete delivery.
+* Keep generated portable executables and ZIPs in the ignored build directory. Commit their
+  reproducible source/build instructions and report the local artifact path; publishing a release
+  is a separate action requiring an explicit request.
+* Report the resulting commit IDs, push destination and verification results. If delivery is
+  blocked, state exactly which step remains incomplete.
+
 # Project Overview
 
 ScreenTask 2.0 is a free, open-source, portable Windows desktop application built with modern
