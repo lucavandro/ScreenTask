@@ -10,7 +10,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\ScreenTask.ico</ApplicationIcon>
     <StartupObject>ScreenTask.Program</StartupObject>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <AssemblyTitle>ScreenTask 2.0</AssemblyTitle>
     <Description>ScreenTask - Free Open Source Offline and Local Network Screen Sharing</Description>
     <Authors>Eslam Hamouda</Authors>

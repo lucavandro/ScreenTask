@@ -2,7 +2,7 @@ namespace ScreenTask
 {
     internal static class Constants
     {
-        public const string AppVersion = "2.0.0";
+        public const string AppVersion = "2.1.0";
         public const string AppSettingsFileName = "appsettings.xml";
         public const string GitHubApiLatestReleaseUrl = "https://api.github.com/repos/EslaMx7/ScreenTask/releases/latest";
         public const string GitHubReleasesUrl = "https://github.com/EslaMx7/ScreenTask/releases/latest";

@@ -698,7 +698,7 @@ namespace ScreenTask.Tests.UI
                 Assert.Contains("Report Bug", mainForm.btnReportIssue.Text);
 
                 var snapshot = mainForm.BuildFeedbackDiagnosticsSnapshot();
-                Assert.Equal("2.0.0", snapshot.AppVersion);
+                Assert.Equal(Constants.AppVersion, snapshot.AppVersion);
                 Assert.False(snapshot.IsAudioEnabled);
                 Assert.Contains("Sample diagnostic log entry", snapshot.RecentLogLines);
 
@@ -709,7 +709,7 @@ namespace ScreenTask.Tests.UI
                 Assert.False(feedbackForm.rbFeatureRequest.Checked);
                 Assert.True(feedbackForm.cbIncludeDiagnostics.Checked);
                 Assert.Contains("## Bug Description", feedbackForm.txtDetails.Text);
-                Assert.Contains("ScreenTask Version: 2.0.0", feedbackForm.txtDiagnostics.Text);
+                Assert.Contains($"ScreenTask Version: {Constants.AppVersion}", feedbackForm.txtDiagnostics.Text);
                 Assert.Contains("Sample diagnostic log entry", feedbackForm.txtDiagnostics.Text);
 
                 feedbackForm.txtTitle.Text = "Audio stutters on second monitor";

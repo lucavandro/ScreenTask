@@ -332,7 +332,7 @@ namespace ScreenTask.WebServer
                 var stats = new
                 {
                     appName = "ScreenTask",
-                    version = "2.0.0",
+                    version = Constants.AppVersion,
                     viewers = _broadcaster.ConnectedClientsCount,
                     fps = _broadcaster.CurrentFps,
                     videoMode = _broadcaster.WebRtcEnabled ? "webrtc" : "jpeg",

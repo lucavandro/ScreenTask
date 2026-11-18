@@ -43,8 +43,8 @@ jobs:
       - name: Package Standalone & Framework-Dependent Binaries
         shell: pwsh
         run: |
-          # Note: Keep major release tags 2-5 chars (e.g., "v2.0") so legacy v1.2 clients
-          # matching \"tag_name\":\"(.{2,5})\", detect the update on startup.
+          # Release tags use MAJOR.MINOR.PATCH (for example v2.1.0).
+          # Legacy v1.2 update checks only recognize shorter tag names.
           $tag = if ($env:GITHUB_REF_NAME -like "v*") { $env:GITHUB_REF_NAME } else { "v2.0" }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
 

@@ -161,7 +161,7 @@ namespace ScreenTask.Tests.Integration
             var root = doc.RootElement;
 
             Assert.Equal("ScreenTask", root.GetProperty("appName").GetString());
-            Assert.Equal("2.0.0", root.GetProperty("version").GetString());
+            Assert.Equal(Constants.AppVersion, root.GetProperty("version").GetString());
             Assert.True(root.TryGetProperty("viewers", out _));
             Assert.True(root.TryGetProperty("fps", out _));
             Assert.InRange(root.GetProperty("pendingFrames").GetInt32(), 0, 1);

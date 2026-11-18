@@ -18,7 +18,7 @@ without installing client software, browser extensions or cloud accounts.
 WebRTC alongside the default JPEG/WebSocket mode, with per-viewer JPEG fallback.
 See [setup, compatibility and measured tradeoffs](docs/WEBRTC_MODE.md).
 
-This checkout includes the capture, performance, desktop and web-viewer updates
+The current source release is **2.1.0** (tag **v2.1.0**). This checkout includes the capture, performance, desktop and web-viewer updates
 described below. The CI badge tracks this repository; release, download and
 popularity badges refer to the original upstream project.
 
