@@ -70,6 +70,9 @@ namespace ScreenTask
         {
             InitializeComponent();
             statusStripMain.ShowItemToolTips = true;
+            menuFeedbackQuick.ForeColor = DesktopTheme.Link;
+            DesktopTheme.ApplyLinks(statusStripMain);
+            DesktopTheme.Apply(this);
             toolTipMain.SetToolTip(qualitySlider,
                 "JPEG quality: lower values reduce detail and bandwidth. They may improve FPS when encoding or the network is the bottleneck; capture speed and resolution are unchanged.");
 
@@ -728,7 +731,7 @@ namespace ScreenTask
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Font = new Font("Segoe UI", 10F, cbPrivate.Checked ? FontStyle.Bold : FontStyle.Regular),
-                ForeColor = cbPrivate.Checked ? Color.FromArgb(20, 90, 170) : SystemColors.GrayText,
+                ForeColor = cbPrivate.Checked ? DesktopTheme.Link : SystemColors.GrayText,
                 Margin = new Padding(0, 2, 0, 14),
                 Text = pinText
             };

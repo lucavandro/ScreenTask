@@ -67,7 +67,7 @@ namespace ScreenTask
             menuHelpAbout = new ToolStripMenuItem();
             menuHelpCheckUpdates = new ToolStripMenuItem();
             menuFeedbackQuick = new ToolStripMenuItem();
-            tabControlMain = new TabControl();
+            tabControlMain = new ScreenTask.UI.ThemedTabControl();
             tabBroadcast = new TabPage();
             tableBroadcast = new TableLayoutPanel();
             grpPreview = new GroupBox();

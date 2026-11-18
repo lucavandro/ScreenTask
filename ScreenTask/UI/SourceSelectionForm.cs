@@ -47,6 +47,7 @@ namespace ScreenTask.UI
             InitializeCustomComponents();
             cbCaptureMouse.Checked = captureMouse;
             PopulateSources(sources, currentSource);
+            DesktopTheme.Apply(this);
 
             _thumbnailTimer.Interval = 2000;
             _thumbnailTimer.Tick += (s, e) => TriggerThumbnailUpdate();
@@ -182,7 +183,7 @@ namespace ScreenTask.UI
             panelBottom.Controls.Add(btnCancel);
             Controls.Add(panelBottom);
 
-            tabControlSources = new TabControl
+            tabControlSources = new ScreenTask.UI.ThemedTabControl
             {
                 Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 9F),

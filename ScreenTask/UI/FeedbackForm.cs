@@ -69,6 +69,7 @@ namespace ScreenTask.UI
 
             InitializeLayout();
             ApplyFeedbackType(initialType, forceResetTemplate: true);
+            DesktopTheme.Apply(this);
         }
 
         public static FeedbackForm CreateCrashReportDialog(Exception exception, FeedbackDiagnosticsSnapshot? baseSnapshot = null)
@@ -301,7 +302,7 @@ namespace ScreenTask.UI
             {
                 AutoSize = true,
                 Dock = DockStyle.Fill,
-                ForeColor = Color.FromArgb(20, 110, 50),
+                ForeColor = DesktopTheme.Success,
                 Margin = new Padding(2, 2, 2, 6),
                 Text = $"Tip: Clicking 'Open on GitHub' or 'Send Email' also copies the full report to your clipboard."
             };
@@ -535,12 +536,12 @@ namespace ScreenTask.UI
             try
             {
                 Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-                lblStatus.ForeColor = Color.FromArgb(20, 110, 50);
+                lblStatus.ForeColor = DesktopTheme.Success;
                 lblStatus.Text = "✓ Opened GitHub Issues in your browser (full report also copied to clipboard).";
             }
             catch
             {
-                lblStatus.ForeColor = Color.FromArgb(180, 60, 20);
+                lblStatus.ForeColor = DesktopTheme.Warning;
                 lblStatus.Text = $"Could not launch browser automatically. Report copied to clipboard — visit {Constants.GitHubIssuesUrl}";
             }
         }
@@ -552,12 +553,12 @@ namespace ScreenTask.UI
             try
             {
                 Process.Start(new ProcessStartInfo(mailto) { UseShellExecute = true });
-                lblStatus.ForeColor = Color.FromArgb(20, 110, 50);
+                lblStatus.ForeColor = DesktopTheme.Success;
                 lblStatus.Text = $"✓ Opened default mail client for {Constants.SupportEmail} (also copied to clipboard if you use webmail).";
             }
             catch
             {
-                lblStatus.ForeColor = Color.FromArgb(180, 60, 20);
+                lblStatus.ForeColor = DesktopTheme.Warning;
                 lblStatus.Text = $"No default mail app found. Full report copied to clipboard — paste and email it to {Constants.SupportEmail}.";
             }
         }
@@ -566,12 +567,12 @@ namespace ScreenTask.UI
         {
             if (TryCopyReportToClipboard(includeHeaderMetadata: true))
             {
-                lblStatus.ForeColor = Color.FromArgb(20, 110, 50);
+                lblStatus.ForeColor = DesktopTheme.Success;
                 lblStatus.Text = $"✓ Copied full report, diagnostics, and {Constants.SupportEmail} address to clipboard!";
             }
             else
             {
-                lblStatus.ForeColor = Color.FromArgb(180, 60, 20);
+                lblStatus.ForeColor = DesktopTheme.Warning;
                 lblStatus.Text = "Could not access system clipboard. You can select and copy the text above manually.";
             }
         }

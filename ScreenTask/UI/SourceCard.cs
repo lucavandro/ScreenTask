@@ -243,7 +243,7 @@ namespace ScreenTask.UI
             using (var g = Graphics.FromImage(bmp))
             {
                 g.Clear(Color.Transparent);
-                using var pen = new Pen(SystemColors.ControlDarkDark, 1.5f);
+                using var pen = new Pen(SystemColors.ControlText, 1.5f);
                 // Monitor outline
                 g.DrawRectangle(pen, 2, 2, 15, 11);
                 // Stand
@@ -259,7 +259,7 @@ namespace ScreenTask.UI
             using (var g = Graphics.FromImage(bmp))
             {
                 g.Clear(Color.Transparent);
-                using var pen = new Pen(SystemColors.ControlDarkDark, 1.5f);
+                using var pen = new Pen(SystemColors.ControlText, 1.5f);
                 // Window outline
                 g.DrawRectangle(pen, 2, 2, 15, 14);
                 // Titlebar
