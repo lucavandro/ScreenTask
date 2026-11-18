@@ -682,16 +682,49 @@
 
   // Fullscreen handling (Cross-platform: Desktop, Android, iOS Safari simulated)
   let isSimulatedFullscreen = false;
+  let fullscreenUiActive = false;
+  let fullscreenTransition = false;
+  let headerExpanded = false;
+  const viewerHeader = document.getElementById('viewerHeader');
+  const btnHeaderToggle = document.getElementById('btnHeaderToggle');
+
+  function isViewerFullscreen() {
+    return isSimulatedFullscreen || !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+  }
+
+  function setHeaderExpanded(expanded) {
+    headerExpanded = fullscreenUiActive && expanded;
+    // Move focus before hiding the header, so it cannot remain on an invisible action.
+    if (!headerExpanded && fullscreenUiActive && viewerHeader?.contains(document.activeElement))
+      btnHeaderToggle?.focus({ preventScroll: true });
+    if (viewerHeader) viewerHeader.hidden = fullscreenUiActive && !headerExpanded;
+    document.body.classList.toggle('header-expanded', headerExpanded);
+    if (btnHeaderToggle) {
+      btnHeaderToggle.setAttribute('aria-expanded', String(headerExpanded));
+      btnHeaderToggle.setAttribute('aria-label', headerExpanded ? 'Hide controls' : 'Show controls');
+      btnHeaderToggle.title = headerExpanded ? 'Hide controls (H)' : 'Show controls (H)';
+    }
+  }
 
   function updateFullscreenBtn(isFullscreen) {
+    const changed = fullscreenUiActive !== isFullscreen;
+    fullscreenUiActive = isFullscreen;
+    document.body.classList.toggle('viewer-fullscreen', isFullscreen);
+    if (btnHeaderToggle) {
+      if (!isFullscreen && document.activeElement === btnHeaderToggle) btnFullscreen?.focus({ preventScroll: true });
+      btnHeaderToggle.hidden = !isFullscreen;
+    }
+    if (changed) setHeaderExpanded(false);
     if (!btnFullscreen) return;
     if (isFullscreen) {
       btnFullscreen.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>`;
-      btnFullscreen.title = "Exit Fullscreen";
+      btnFullscreen.title = 'Exit fullscreen';
     } else {
       btnFullscreen.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 2 2h3"></path></svg>`;
-      btnFullscreen.title = "Toggle Fullscreen";
+      btnFullscreen.title = 'Enter fullscreen';
     }
+    btnFullscreen.setAttribute('aria-label', btnFullscreen.title);
+    btnFullscreen.setAttribute('aria-pressed', String(isFullscreen));
     sendTelemetry();
   }
 
@@ -701,7 +734,6 @@
     document.documentElement.classList.add('simulated-fullscreen');
     window.scrollTo(0, 1);
     updateFullscreenBtn(true);
-    showToast("🖥️ Entered Fullscreen Mode");
   }
 
   function exitSimulatedFullscreen() {
@@ -711,43 +743,49 @@
     updateFullscreenBtn(false);
   }
 
-  function toggleFullscreen() {
+  async function toggleFullscreen() {
+    if (fullscreenTransition) return;
+    fullscreenTransition = true;
     const docEl = document.documentElement;
-    const isStandardFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
-
-    if (isSimulatedFullscreen) {
-      exitSimulatedFullscreen();
-      return;
-    }
-
-    if (isStandardFullscreen) {
-      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
-      else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-      updateFullscreenBtn(false);
-      return;
-    }
-
-    if (docEl.requestFullscreen) {
-      docEl.requestFullscreen().then(() => {
-        updateFullscreenBtn(true);
-      }).catch(() => {
-        activateSimulatedFullscreen();
-      });
-    } else if (docEl.webkitRequestFullscreen) {
-      docEl.webkitRequestFullscreen();
-      updateFullscreenBtn(true);
-    } else {
-      activateSimulatedFullscreen();
-    }
+    try {
+      if (isSimulatedFullscreen) { exitSimulatedFullscreen(); return; }
+      if (isViewerFullscreen()) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+        updateFullscreenBtn(isViewerFullscreen());
+      } else {
+        try {
+          if (docEl.requestFullscreen) await docEl.requestFullscreen();
+          else if (docEl.webkitRequestFullscreen) await docEl.webkitRequestFullscreen();
+          else { activateSimulatedFullscreen(); return; }
+          updateFullscreenBtn(isViewerFullscreen());
+        } catch (e) { activateSimulatedFullscreen(); }
+      }
+    } catch (e) { updateFullscreenBtn(isViewerFullscreen()); }
+    finally { fullscreenTransition = false; }
   }
 
   btnFullscreen?.addEventListener('click', toggleFullscreen);
+  btnHeaderToggle?.addEventListener('click', () => setHeaderExpanded(!headerExpanded));
+
+  document.addEventListener('keydown', (event) => {
+    if (!fullscreenUiActive || event.ctrlKey || event.altKey || event.metaKey || event.repeat ||
+        event.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+    if (event.key.toLowerCase() === 'h') {
+      event.preventDefault();
+      setHeaderExpanded(!headerExpanded);
+      btnHeaderToggle?.focus({ preventScroll: true });
+    } else if (event.key === 'Escape' && isSimulatedFullscreen) {
+      event.preventDefault();
+      exitSimulatedFullscreen();
+    }
+  });
 
   document.addEventListener('fullscreenchange', () => {
-    updateFullscreenBtn(!!document.fullscreenElement);
+    updateFullscreenBtn(isViewerFullscreen());
   });
   document.addEventListener('webkitfullscreenchange', () => {
-    updateFullscreenBtn(!!document.webkitFullscreenElement);
+    updateFullscreenBtn(isViewerFullscreen());
   });
 
   // Auto-Hiding Floating Toolbar on Mobile & Fullscreen
