@@ -37,14 +37,29 @@ Sources:
 ## Application icon
 
 `ScreenTask/Assets/ScreenTask.png` is the generated master. `ScreenTask.ico`
-contains 16, 20, 24, 32, 40, 48, 64, 128 and 256-pixel frames. Every frame is
-fully opaque, with a filled monitor and broadcast mark on a muted blue tile.
+contains 16, 20, 24, 32, 40, 48, 64, 128 and 256-pixel frames. The current icon
+uses a circular blue-to-cyan badge with an ivory monitor and a simplified
+broadcast symbol. The outer corners are transparent so the silhouette remains
+circular; the badge and glyphs use filled colors without transparent cutouts.
+A light blue perimeter keeps the silhouette readable on light and dark themes.
 The executable, main window and notification-area icon use the same ICO.
 The original legacy ICO files are retained.
 
-Created with the built-in **imagegen** tool. Final generation prompt:
+Created with the built-in **imagegen** tool. Design brief: a modern circular
+screen-sharing badge, a simple rounded monitor, two bold broadcast arcs and a
+dot, a restrained cobalt-to-teal palette, no lettering, no outer shadow and
+transparency only outside the circular badge. The previous icon supplied the
+screen-sharing motif as a reference.
 
-> Use case: logo-brand. Create one finished square Windows desktop application icon for ScreenTask, an offline local-network screen-sharing app. A simple filled computer monitor with a small three-arc broadcast mark integrated into its screen, bold enough to recognize at 16 pixels. Flat precise modern geometric shapes, front view, centered, generous but not excessive margins. Opaque muted medium blue square tile background covering the entire canvas edge to edge, pale cool ivory filled monitor silhouette, a darker slate-blue inset display and pale blue broadcast mark. Restrained soft contrast, solid fills, very few details, thick clean silhouette. Must remain clearly visible on both dark and light Windows taskbars, without depending on background transparency. No letters, no words, no numbers, no glass, no transparency, no tiny strokes, no 3D perspective, no glows, no mockup, no extra backdrop outside the icon tile. Asset is the icon itself, not a presentation of an icon. High resolution square PNG.
+Regenerate the Windows ICO from the PNG master on Windows without extra tools:
+
+```powershell
+./scripts/Build-AppIcon.ps1
+```
+
+The script resamples the master into nine PNG-backed 32-bit ICO entries and
+preserves alpha for Windows 10/11. Rebuild the application afterward because
+both the executable and WinForms resources embed the ICO at build time.
 
 ## Verification
 
@@ -55,7 +70,7 @@ Created with the built-in **imagegen** tool. Final generation prompt:
 - Main Broadcast/Viewers/Settings tabs, source picker and feedback form rendered
   for inspection. Real on-screen capture additionally checked title-bar styling.
 - QR background and form/tray icons checked during preview; ICO dimensions and
-  full opacity checked in every frame.
+  transparent corners and filled centers checked in the ICO frames.
 
 Local preview harness and screenshots: `build/theme-preview/` (ignored build
 artifacts). No new screen capture or encoding benchmark is needed for these UI
