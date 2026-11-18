@@ -163,13 +163,15 @@ namespace ScreenTask.Core.Capture
             await _broadcaster.BroadcastAudioChunkAsync(pcmChunk);
         }
 
-        private async Task CaptureLoop(CancellationToken token)
+        private void CaptureLoop(CancellationToken token)
         {
-            var stopwatch = new Stopwatch();
+            using var pacer = new FramePacer(token);
+            long deadline = Stopwatch.GetTimestamp();
+            int previousFps = Math.Clamp(TargetFps, 1, 60);
 
             while (!token.IsCancellationRequested && IsRunning)
             {
-                stopwatch.Restart();
+                long iterationStarted = Stopwatch.GetTimestamp();
 
                 try
                 {
@@ -216,7 +218,7 @@ namespace ScreenTask.Core.Capture
                             try { PreviewFrameAvailable(frameToBroadcast); } catch { }
                         }
 
-                        await _broadcaster.BroadcastBitmapAsync(frameToBroadcast);
+                        _broadcaster.BroadcastBitmapAsync(frameToBroadcast).GetAwaiter().GetResult();
 
                         if (shouldDispose)
                         {
@@ -229,21 +231,11 @@ namespace ScreenTask.Core.Capture
                     // Catch transient desktop capture errors
                 }
 
-                int targetIntervalMs = Math.Max(10, 1000 / Math.Clamp(TargetFps, 1, 60));
-                int elapsed = (int)stopwatch.ElapsedMilliseconds;
-                int delay = targetIntervalMs - elapsed;
-
-                if (delay > 0)
-                {
-                    try
-                    {
-                        await Task.Delay(delay, token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
-                }
+                int fps = Math.Clamp(TargetFps, 1, 60);
+                if (fps != previousFps) { deadline = iterationStarted; previousFps = fps; }
+                long currentTicks = Stopwatch.GetTimestamp();
+                deadline = FramePacer.NextDeadline(deadline, currentTicks, fps);
+                if (!pacer.Wait(TimeSpan.FromSeconds((deadline - currentTicks) / (double)Stopwatch.Frequency))) break;
             }
         }
 
