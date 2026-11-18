@@ -5,7 +5,7 @@ namespace ScreenTask.Core.Network;
 internal enum FirewallPortState { Allowed, Blocked, Unknown, LocalOnly, Disabled }
 
 internal sealed record FirewallPortStatus(FirewallPortState State, string Detail);
-internal sealed record FirewallEndpoint(string Address, int Port, string ApplicationPath);
+internal sealed record FirewallEndpoint(string Address, int Port, string ApplicationPath, int Protocol = 6, bool IncludeUdp = false);
 
 // Plain snapshots let the policy decision be tested without altering Windows Firewall.
 internal sealed record FirewallRuleSnapshot
@@ -42,6 +42,7 @@ internal static class FirewallPolicyEvaluator
         if (policy.Profile is not (1 or 2 or 4) || policy.Managed)
             return new(FirewallPortState.Unknown, "The network profile or managed firewall policy cannot be evaluated reliably.");
         string profile = policy.Profile switch { 1 => "Domain", 2 => "Private", _ => "Public" };
+        string protocol = endpoint.Protocol == 17 ? "UDP" : "TCP";
         if (!policy.Enabled)
             return new(FirewallPortState.Disabled, $"Windows Firewall is disabled for this interface/profile ({profile}).");
         if (policy.BlockAll)
@@ -70,14 +71,14 @@ internal static class FirewallPolicyEvaluator
         if (block || (possibleBlock && (allow || possibleAllow)) || (!allow && possibleAllow))
             return new(FirewallPortState.Unknown, $"{profile}: scoped, authenticated or unsupported rules require verification from the viewer device.");
         return allow
-            ? new(FirewallPortState.Allowed, $"{profile}: inbound TCP is allowed by the inspected Windows Firewall policy.")
-            : new(FirewallPortState.Blocked, $"{profile}: default inbound policy blocks TCP and no applicable allow rule was found.");
+            ? new(FirewallPortState.Allowed, $"{profile}: inbound {protocol} is allowed by the inspected Windows Firewall policy.")
+            : new(FirewallPortState.Blocked, $"{profile}: default inbound policy blocks {protocol} and no applicable allow rule was found.");
     }
 
     private static Match Matches(FirewallRuleSnapshot rule, FirewallEndpoint endpoint, FirewallPolicySnapshot policy)
     {
         if (!rule.Enabled || !rule.Inbound || (rule.Profiles & policy.Profile) == 0 ||
-            rule.Protocol is not (6 or 256) || !string.IsNullOrWhiteSpace(rule.Service) || !string.IsNullOrWhiteSpace(rule.Package))
+            (rule.Protocol != endpoint.Protocol && rule.Protocol != 256) || !string.IsNullOrWhiteSpace(rule.Service) || !string.IsNullOrWhiteSpace(rule.Package))
             return Match.No;
         if (!string.IsNullOrWhiteSpace(rule.Application) && rule.Application != "*" &&
             !string.Equals(Environment.ExpandEnvironmentVariables(rule.Application), endpoint.ApplicationPath, StringComparison.OrdinalIgnoreCase))
@@ -90,7 +91,17 @@ internal static class FirewallPolicyEvaluator
             !rule.InterfaceTypes.Split(',').Any(t => t.Trim().Equals(policy.InterfaceType, StringComparison.OrdinalIgnoreCase)))
             return string.IsNullOrEmpty(policy.InterfaceType) ? Match.Uncertain : Match.No;
         return port == Match.Uncertain || address == Match.Uncertain || rule.SecurityRestricted ||
-            !IsAny(rule.RemoteAddresses) || (rule.Protocol == 6 && !IsAny(rule.RemotePorts)) ? Match.Uncertain : Match.Yes;
+            !IsAny(rule.RemoteAddresses) || (rule.Protocol != 256 && !IsAny(rule.RemotePorts)) ? Match.Uncertain : Match.Yes;
+    }
+
+    internal static FirewallPortStatus CombineTcpUdp(FirewallPortStatus tcp, FirewallPortStatus udp)
+    {
+        FirewallPortState state = tcp.State == FirewallPortState.Blocked || udp.State == FirewallPortState.Blocked ? FirewallPortState.Blocked
+            : tcp.State == FirewallPortState.Unknown || udp.State == FirewallPortState.Unknown ? FirewallPortState.Unknown
+            : tcp.State == FirewallPortState.LocalOnly && udp.State == FirewallPortState.LocalOnly ? FirewallPortState.LocalOnly
+            : tcp.State == FirewallPortState.Disabled && udp.State == FirewallPortState.Disabled ? FirewallPortState.Disabled
+            : FirewallPortState.Allowed;
+        return new(state, $"TCP: {tcp.Detail}\nUDP: {udp.Detail}");
     }
 
     private static bool IsAny(string value) => value.Trim() == "*";

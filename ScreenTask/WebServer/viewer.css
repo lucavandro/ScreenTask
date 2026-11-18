@@ -168,7 +168,7 @@ header {
   touch-action: none;
 }
 
-#screenCanvas {
+#screenCanvas, #rtcVideo {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
@@ -178,7 +178,7 @@ header {
   touch-action: none;
 }
 
-#screenCanvas:active {
+#screenCanvas:active, #rtcVideo:active {
   cursor: grabbing;
 }
 
@@ -467,3 +467,5 @@ body.simulated-fullscreen {
     padding: 0.6rem 1rem;
   }
 }
+
+#rtcVideo { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center center; }

@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Diagnostics;
+using System.Text.Json;
+using ScreenTask.Core.Streaming.WebRtc;
 using System.IO;
 using System.Net.WebSockets;
 using System.Threading;
@@ -15,6 +17,16 @@ namespace ScreenTask.Core.Streaming
         private readonly ConcurrentDictionary<string, (WebSocket Socket, SemaphoreSlim Lock)> _videoClients = new();
         private readonly ConcurrentDictionary<string, (WebSocket Socket, SemaphoreSlim Lock)> _audioClients = new();
         private readonly ConcurrentDictionary<string, ViewerSession> _sessions = new();
+        private readonly WebRtcVideoServer _webRtc = new();
+        private readonly ConcurrentDictionary<string, byte> _webRtcViewers = new();
+        private long _lastSnapshotTicks;
+        public bool WebRtcEnabled => _webRtc.Enabled;
+        public string WebRtcEncoder => _webRtc.EncoderBackend;
+        public string? WebRtcUnavailableReason => _webRtc.UnavailableReason;
+        public int VideoTargetFps { get; set; } = 30;
+        public bool ConfigureWebRtc(bool enabled, string address, int port) => _webRtc.Configure(enabled, address, port);
+        public void ResetWebRtc() => _webRtc.Reset();
+
         private readonly ImageCodecInfo _jpegEncoder;
         private double _lastEncodeMilliseconds;
         public double LastEncodeMilliseconds => Volatile.Read(ref _lastEncodeMilliseconds);
@@ -82,6 +94,13 @@ namespace ScreenTask.Core.Streaming
             _jpegEncoder = GetEncoder(ImageFormat.Jpeg) ?? throw new InvalidOperationException("JPEG encoder not found");
             _encoderParams = CreateEncoderParams(Math.Clamp(initialQuality, 10, 100));
             _lastFpsTimestamp = Environment.TickCount64;
+            _webRtc.FrameSent += bytes => { Interlocked.Add(ref _totalBytesTransferred, bytes); Interlocked.Increment(ref _totalFramesSent); };
+            _webRtc.FrameDropped += () => Interlocked.Increment(ref _totalFramesDropped);
+            _webRtc.Fallback += (id, reason) =>
+            {
+                _webRtcViewers.TryRemove(id, out _);
+                _ = SendControlAsync(id, new { type = "webrtc-fallback", reason });
+            };
         }
 
         public void SetQuality(int quality)
@@ -124,6 +143,10 @@ namespace ScreenTask.Core.Streaming
 
         public void RemoveVideoClient(string id)
         {
+            // Revoke media immediately; native connection teardown may block and runs off the UI thread.
+            _webRtc.StopSending(id);
+            _webRtcViewers.TryRemove(id, out _);
+            _ = Task.Run(() => _webRtc.Remove(id));
             if (_videoClients.TryRemove(id, out var entry))
             {
                 // SemaphoreSlim has no wait handle here; let in-flight operations release it before GC.
@@ -247,6 +270,40 @@ namespace ScreenTask.Core.Streaming
             return sendTasks.Count;
         }
 
+        public async Task StartWebRtcAsync(string id, CancellationToken token)
+        {
+            if (!_videoClients.ContainsKey(id)) return;
+            if (!_webRtcViewers.TryAdd(id, 0)) return;
+            try
+            {
+                string sdp = await _webRtc.CreateOfferAsync(id, token);
+                await SendControlAsync(id, new { type = "webrtc-offer", sdp });
+            }
+            catch
+            {
+                _webRtc.UseJpeg(id, "WebRTC negotiation failed; using JPEG.");
+            }
+        }
+
+        public void SetWebRtcAnswer(string id, string sdp) => _webRtc.SetAnswer(id, sdp);
+        public void UseJpeg(string id) => _webRtc.UseJpeg(id, "WebRTC unavailable in this viewer; using JPEG.");
+
+        public async Task SendControlAsync(string id, object message)
+        {
+            if (!_videoClients.TryGetValue(id, out var entry)) return;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            bool acquired = false;
+            try
+            {
+                await entry.Lock.WaitAsync(timeout.Token);
+                acquired = true;
+                if (entry.Socket.State == WebSocketState.Open)
+                    await entry.Socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(message), WebSocketMessageType.Text, true, timeout.Token);
+            }
+            catch { }
+            finally { if (acquired) entry.Lock.Release(); }
+        }
+
         public async Task SendPongAsync(string clientId, double timestamp)
         {
             if (_videoClients.TryGetValue(clientId, out var entry))
@@ -287,23 +344,25 @@ namespace ScreenTask.Core.Streaming
 
             // Snapshot the client collection so connecting/disconnecting viewers
             // cannot change the audience while this immutable JPEG is encoded.
-            var clients = _videoClients.ToArray();
-            byte[] packet;
-            lock (_encoderLock)
+            var clients = _videoClients.Where(c => !_webRtcViewers.ContainsKey(c.Key)).ToArray();
+            int produced = _webRtc.Broadcast(bitmap, VideoTargetFps);
+            byte[]? packet = null;
+            long snapshotNow = Stopwatch.GetTimestamp();
+            // REST snapshots remain available without paying for JPEG at every WebRTC frame.
+            if (!_webRtc.Enabled || clients.Length > 0 || Stopwatch.GetElapsedTime(_lastSnapshotTicks, snapshotNow).TotalSeconds >= 1)
             {
-                packet = EncodeJpegPacket(bitmap);
+                lock (_encoderLock) packet = EncodeJpegPacket(bitmap);
+                _lastSnapshotTicks = snapshotNow;
+                lock (_snapshotLock)
+                {
+                    _latestVideoPacket = packet;
+                    _latestJpegSnapshot = null;
+                }
+                if (!_webRtc.Enabled || clients.Length > 0) produced = Math.Max(produced, 1);
             }
             Volatile.Write(ref _lastEncodeMilliseconds, Stopwatch.GetElapsedTime(encodeStarted).TotalMilliseconds);
-            lock (_snapshotLock)
-            {
-                _latestVideoPacket = packet;
-                _latestJpegSnapshot = null; // Materialize the header-free JPEG only on request.
-            }
-
-            Interlocked.Increment(ref _frameCounter);
-
-            // Update FPS metrics
-            Interlocked.Increment(ref _fpsCounter);
+            Interlocked.Add(ref _frameCounter, produced);
+            _fpsCounter += produced;
             var now = Environment.TickCount64;
             if (now - _lastFpsTimestamp >= 1000)
             {
@@ -314,10 +373,10 @@ namespace ScreenTask.Core.Streaming
 
             // Each client has at most one send in flight. Busy clients skip this frame;
             // capture and fast viewers never wait for a slow network connection.
-            foreach (var kvp in clients)
-            {
-                _ = SendToClientAsync(kvp.Key, kvp.Value.Socket, kvp.Value.Lock, packet, isAudio: false);
-            }
+            if (packet != null) foreach (var kvp in clients)
+                {
+                    _ = SendToClientAsync(kvp.Key, kvp.Value.Socket, kvp.Value.Lock, packet, isAudio: false);
+                }
             return Task.CompletedTask;
         }
 
@@ -448,6 +507,8 @@ namespace ScreenTask.Core.Streaming
 
         public void Dispose()
         {
+            _ = Task.Run(() => _webRtc.Dispose());
+            _webRtcViewers.Clear();
             foreach (var kvp in _videoClients)
             {
                 try

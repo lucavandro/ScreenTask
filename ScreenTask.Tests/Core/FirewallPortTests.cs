@@ -4,6 +4,30 @@ namespace ScreenTask.Tests.Core;
 
 public class FirewallPortTests
 {
+    [Fact]
+    public void WebRtc_RequiresBothTcpAndUdp_AndRetainsProtocolUncertainty()
+    {
+        var udp = Endpoint with { Protocol = 17 };
+        var tcpAllowed = FirewallPolicyEvaluator.Evaluate(Endpoint, Policy(AllowPort));
+        var udpBlocked = FirewallPolicyEvaluator.Evaluate(udp, Policy(AllowPort));
+        Assert.Equal(FirewallPortState.Blocked, FirewallPolicyEvaluator.CombineTcpUdp(tcpAllowed, udpBlocked).State);
+        var udpAllowed = FirewallPolicyEvaluator.Evaluate(udp, Policy(AllowPort with { Protocol = 17 }));
+        Assert.Equal(FirewallPortState.Allowed, FirewallPolicyEvaluator.CombineTcpUdp(tcpAllowed, udpAllowed).State);
+        var udpRestricted = FirewallPolicyEvaluator.Evaluate(udp, Policy(AllowPort with { Protocol = 17, RemoteAddresses = "LocalSubnet" }));
+        Assert.Equal(FirewallPortState.Unknown, FirewallPolicyEvaluator.CombineTcpUdp(tcpAllowed, udpRestricted).State);
+        Assert.Equal(FirewallPortState.Blocked, FirewallPolicyEvaluator.Evaluate(Endpoint, Policy(AllowPort with { Protocol = 17 })).State);
+    }
+
+    [Fact]
+    public void FirewallCommands_OpenUdpOnlyWhenRequested_AndValidatePort()
+    {
+        Assert.DoesNotContain("protocol=udp", FirewallHelper.BuildRuleScript(7070, false));
+        string commands = FirewallHelper.BuildRuleScript(7070, true);
+        Assert.Contains("protocol=tcp localport=7070", commands);
+        Assert.Contains("protocol=udp localport=7070", commands);
+        Assert.Throws<ArgumentOutOfRangeException>(() => FirewallHelper.BuildRuleScript(0, true));
+        Assert.Throws<ArgumentOutOfRangeException>(() => FirewallHelper.BuildRuleScript(65536, true));
+    }
     private static readonly FirewallEndpoint Endpoint = new("192.168.1.10", 7070, @"C:\ScreenTask\ScreenTask.exe");
     private static readonly FirewallRuleSnapshot AllowPort = new() { LocalPorts = "7070" };
     private static FirewallPolicySnapshot Policy(params FirewallRuleSnapshot[] rules) => new(2, true, false, false, false, "Wi-Fi", "Wireless", rules);

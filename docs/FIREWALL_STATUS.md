@@ -18,6 +18,11 @@ that the port is allowed.
 
 ## Inspection and refresh
 
+In WebRTC mode both TCP and UDP on the selected port are evaluated. Either
+protocol being blocked produces Blocked; a restricted or unknown result remains
+Unknown. The explicit Allow Port action adds TCP and UDP rules together only
+when WebRTC is selected. Merely selecting the mode never modifies firewall rules.
+
 - Read-only `HNetCfg.FwPolicy2` queries run in the background. No elevation, rule
   creation, network probe or firewall configuration change is performed by the indicator.
 - Network List Manager maps the selected adapter to its actual Public, Private or

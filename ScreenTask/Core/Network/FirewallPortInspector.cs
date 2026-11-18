@@ -55,7 +55,7 @@ internal static class FirewallPortInspector
                         dynamic r = item;
                         if (!(bool)r.Enabled || (int)r.Direction != 1 || (((int)r.Profiles & profile) == 0)) continue;
                         int protocol = r.Protocol;
-                        if (protocol is not (6 or 256)) continue;
+                        if (protocol != endpoint.Protocol && protocol != 256) continue;
                         string package = "";
                         bool securityRestricted;
                         try

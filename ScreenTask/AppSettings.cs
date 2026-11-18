@@ -10,6 +10,7 @@ namespace ScreenTask
         public int Port { get; set; } = 7070;
         public int TargetFps { get; set; } = 30;
         public int ImageQuality { get; set; } = 80;
+        public string StreamingMode { get; set; } = "Jpeg";
         public bool IsPrivateSession { get; set; } = false;
         public string PinCode { get; set; } = "";
         public bool IsShowMouseEnabled { get; set; } = true;

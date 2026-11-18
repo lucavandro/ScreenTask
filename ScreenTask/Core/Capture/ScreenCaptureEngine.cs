@@ -326,6 +326,7 @@ namespace ScreenTask.Core.Capture
                 _lastPreviewTicks = now;
                 try { PreviewFrameAvailable(frame.Bitmap); } catch { }
             }
+            _broadcaster.VideoTargetFps = TargetFps;
             _broadcaster.BroadcastBitmapAsync(frame.Bitmap).GetAwaiter().GetResult();
             double age = Stopwatch.GetElapsedTime(frame.Started).TotalMilliseconds;
             Volatile.Write(ref _lastFrameAgeMilliseconds, age);

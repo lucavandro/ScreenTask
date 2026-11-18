@@ -24,10 +24,14 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Prepare portable WebRTC runtime
+        shell: pwsh
+        run: ./scripts/Prepare-WebRtcRuntime.ps1
+
       - name: Verify JavaScript syntax (Web Viewer)
         run: |
           node -c ScreenTask/WebServer/viewer.js
-          node --test ScreenTask.Tests/Web/viewer-decoder.test.cjs
+          node --test ScreenTask.Tests/Web/viewer-decoder.test.cjs ScreenTask.Tests/Web/viewer-webrtc.test.cjs
 
       - name: Build Release (Zero Warnings/Errors)
         run: dotnet build -c Release --no-restore
@@ -47,4 +51,5 @@ jobs:
           path: |
             publish/win-x64/ScreenTask.exe
             publish/win-x64/DirectX-NOTICE.txt
+            publish/win-x64/WebRTC-NOTICE.txt
           if-no-files-found: error

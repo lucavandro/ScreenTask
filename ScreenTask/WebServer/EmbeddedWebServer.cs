@@ -29,6 +29,7 @@ namespace ScreenTask.WebServer
         public string HostIp { get; private set; } = "127.0.0.1";
         public int Port { get; private set; } = 7070;
         public bool IsRunning { get; private set; }
+        public bool PreferWebRtc { get; set; }
         public bool RequirePin { get; set; }
         public string PinCode { get; set; } = "";
 
@@ -61,6 +62,7 @@ namespace ScreenTask.WebServer
             HostIp = ip;
             Port = port;
             _cts = new CancellationTokenSource();
+            await Task.Run(() => _broadcaster.ConfigureWebRtc(PreferWebRtc, ip, port));
 
             var builder = WebApplication.CreateEmptyBuilder(new WebApplicationOptions
             {
@@ -83,8 +85,20 @@ namespace ScreenTask.WebServer
 
             ConfigureRoutes(_app);
 
-            await _app.StartAsync(_cts.Token);
-            IsRunning = true;
+            try
+            {
+                await _app.StartAsync(_cts.Token);
+                IsRunning = true;
+            }
+            catch
+            {
+                await _app.DisposeAsync();
+                _app = null;
+                _cts.Dispose();
+                _cts = null;
+                await Task.Run(() => _broadcaster.ResetWebRtc());
+                throw;
+            }
         }
 
         public async Task StopAsync()
@@ -104,6 +118,7 @@ namespace ScreenTask.WebServer
                 _cts?.Dispose();
                 _cts = null;
                 IsRunning = false;
+                await Task.Run(() => _broadcaster.ResetWebRtc());
             }
         }
 
@@ -179,20 +194,36 @@ namespace ScreenTask.WebServer
 
                 _broadcaster.AddVideoClient(clientId, webSocket, remoteIp, userAgent);
 
-                var buffer = new byte[2048];
+                using var connection = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, _cts?.Token ?? CancellationToken.None);
+                bool capable = context.Request.Query["webrtc"] == "1";
+                if (capable)
+                {
+                    await _broadcaster.SendControlAsync(clientId, new { type = "stream-config", videoMode = _broadcaster.WebRtcEnabled ? "webrtc" : "jpeg" });
+                }
+                Task negotiation = capable && _broadcaster.WebRtcEnabled
+                    ? _broadcaster.StartWebRtcAsync(clientId, connection.Token) : Task.CompletedTask;
+                var buffer = new byte[65536];
                 try
                 {
-                    while (webSocket.State == WebSocketState.Open && !_cts!.Token.IsCancellationRequested)
+                    while (webSocket.State == WebSocketState.Open && !connection.IsCancellationRequested)
                     {
-                        var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), _cts.Token);
+                        int received = 0;
+                        WebSocketReceiveResult result;
+                        do
+                        {
+                            result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer, received, buffer.Length - received), connection.Token);
+                            received += result.Count;
+                            if (!result.EndOfMessage && received == buffer.Length) throw new InvalidDataException("Control message too large.");
+                        } while (!result.EndOfMessage);
+
                         if (result.MessageType == WebSocketMessageType.Close)
                         {
                             await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
                             break;
                         }
-                        else if (result.MessageType == WebSocketMessageType.Text && result.Count > 0)
+                        else if (result.MessageType == WebSocketMessageType.Text && received > 0)
                         {
-                            var jsonStr = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                            var jsonStr = Encoding.UTF8.GetString(buffer, 0, received);
                             try
                             {
                                 using var doc = JsonDocument.Parse(jsonStr);
@@ -204,6 +235,12 @@ namespace ScreenTask.WebServer
                                     {
                                         await _broadcaster.SendPongAsync(clientId, tProp.GetDouble());
                                     }
+                                    else if (type == "webrtc-answer" && capable && root.TryGetProperty("sdp", out var sdp))
+                                    {
+                                        try { _broadcaster.SetWebRtcAnswer(clientId, sdp.GetString() ?? ""); }
+                                        catch { _broadcaster.UseJpeg(clientId); }
+                                    }
+                                    else if (type == "webrtc-fallback" && capable) _broadcaster.UseJpeg(clientId);
                                     else if (type == "telemetry")
                                     {
                                         double rtt = root.TryGetProperty("rtt", out var rProp) ? rProp.GetDouble() : 0.0;
@@ -219,7 +256,9 @@ namespace ScreenTask.WebServer
                 catch { }
                 finally
                 {
+                    connection.Cancel();
                     _broadcaster.RemoveVideoClient(clientId);
+                    try { await negotiation.WaitAsync(TimeSpan.FromSeconds(1)); } catch { }
                 }
             });
 
@@ -296,6 +335,9 @@ namespace ScreenTask.WebServer
                     version = "2.0.0",
                     viewers = _broadcaster.ConnectedClientsCount,
                     fps = _broadcaster.CurrentFps,
+                    videoMode = _broadcaster.WebRtcEnabled ? "webrtc" : "jpeg",
+                    videoEncoder = _broadcaster.WebRtcEncoder,
+                    webRtcUnavailableReason = _broadcaster.WebRtcUnavailableReason,
                     captureBackend = _captureEngine.CaptureBackend,
                     captureMilliseconds = _captureEngine.LastCaptureMilliseconds,
                     encodeMilliseconds = _broadcaster.LastEncodeMilliseconds,

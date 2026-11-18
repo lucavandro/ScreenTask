@@ -13,6 +13,10 @@
 
 Viewers connect instantly via any web browser on desktop, tablet, or smartphone (iOS Safari, Android Chrome) with zero client software, browser extensions, or cloud accounts required.
 
+**Optional WebRTC video:** Settings & Logs → Video transport offers H.264 over
+WebRTC alongside the default JPEG/WebSocket mode, with per-viewer JPEG fallback.
+See [setup, compatibility and measured tradeoffs](docs/WEBRTC_MODE.md).
+
 🌐 **Official Website**: [https://screentask.eslamx.com/](https://screentask.eslamx.com/) · 🚀 **What's New in 2.0**: [https://screentask.eslamx.com/v2](https://screentask.eslamx.com/v2) · 📦 **Legacy v1.2 Archive**: [https://screentask.eslamx.com/v1](https://screentask.eslamx.com/v1)
 
 [![ScreenTask 2.0 Desktop Application showing 16:9 Live Preview, Audio Control, and QR Code Phone Pairing](https://screentask.eslamx.com/screenshots/v2-main.png)](https://screentask.eslamx.com/)

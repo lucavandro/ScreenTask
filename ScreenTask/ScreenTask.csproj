@@ -16,6 +16,7 @@
     <Authors>Eslam Hamouda</Authors>
     <Copyright>Copyright © 2014-2026 Eslam Hamouda</Copyright>
     <LangVersion>13.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <NoWarn>$(NoWarn);CA1416;WFO1000</NoWarn>
   </PropertyGroup>
@@ -28,13 +29,18 @@
     <PackageReference Include="NAudio.Wasapi" Version="3.1.0" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.MediaFoundation" Version="3.8.3" />
+    <PackageReference Include="MediaToolkit.WebRtc.Native.win-x64" Version="0.24.6.1" GeneratePathProperty="true" ExcludeAssets="build;buildTransitive;contentFiles" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="WebServer\**" />
+    <EmbeddedResource Include="$(PkgMediaToolkit_WebRtc_Native_win-x64)\native\win-x64\datachannel.dll" LogicalName="ScreenTask.Native.datachannel.dll" />
+    <EmbeddedResource Include="..\build\native-webrtc\*.dll" LogicalName="ScreenTask.Native.%(Filename)%(Extension)" />
     <Content Include="file_icon.ico" />
     <Content Include="screenicon.ico" />
     <None Update="DirectX-NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Update="WebRTC-NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
 </Project>

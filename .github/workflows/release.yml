@@ -26,10 +26,14 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
+      - name: Prepare portable WebRTC runtime
+        shell: pwsh
+        run: ./scripts/Prepare-WebRtcRuntime.ps1
+
       - name: Verify JavaScript syntax (Web Viewer)
         run: |
           node -c ScreenTask/WebServer/viewer.js
-          node --test ScreenTask.Tests/Web/viewer-decoder.test.cjs
+          node --test ScreenTask.Tests/Web/viewer-decoder.test.cjs ScreenTask.Tests/Web/viewer-webrtc.test.cjs
 
       - name: Build & Run Automated Test Suite
         run: |
@@ -51,13 +55,14 @@ jobs:
 
           Copy-Item "publish/standalone/ScreenTask.exe" "dist/ScreenTask-$tag-win-x64-standalone.exe"
           Copy-Item "publish/standalone/DirectX-NOTICE.txt" "dist/DirectX-NOTICE.txt"
+          Copy-Item "publish/standalone/WebRTC-NOTICE.txt" "dist/WebRTC-NOTICE.txt"
 
           # 2. Lightweight Framework-Dependent Single-File ZIP (Requires .NET 9 Desktop Runtime)
           dotnet publish ScreenTask/ScreenTask.csproj -c Release -r win-x64 --self-contained false `
             -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false `
             -o publish/fxdependent
 
-          Compress-Archive -Path "publish/fxdependent/ScreenTask.exe", "publish/fxdependent/DirectX-NOTICE.txt", "README.md" `
+          Compress-Archive -Path "publish/fxdependent/ScreenTask.exe", "publish/fxdependent/DirectX-NOTICE.txt", "publish/fxdependent/WebRTC-NOTICE.txt", "README.md" `
             -DestinationPath "dist/ScreenTask-$tag-win-x64-portable.zip" -Force
 
           # 3. Generate SHA-256 Checksums
@@ -88,3 +93,4 @@ jobs:
             dist/ScreenTask-*-win-x64-portable.zip
             dist/SHA256SUMS.txt
             dist/DirectX-NOTICE.txt
+            dist/WebRTC-NOTICE.txt

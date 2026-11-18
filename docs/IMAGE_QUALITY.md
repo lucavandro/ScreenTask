@@ -9,5 +9,7 @@ capture resolution, capture cost or target FPS. An FPS increase depends on the
 screen content and current bottleneck and is not guaranteed. A quality value of
 80 does not mean the output is 80% of the original file size.
 
-The slider tooltip explains this distinction. JPEG remains the production codec
-after the [WebP performance evaluation](WEBP_PERFORMANCE.md).
+The slider tooltip explains this distinction. JPEG remains the default codec
+after the [WebP performance evaluation](WEBP_PERFORMANCE.md). The optional
+[WebRTC/H.264 mode](WEBRTC_MODE.md) uses its own bitrate target, so the slider is
+disabled there and its saved value applies to JPEG fallback.

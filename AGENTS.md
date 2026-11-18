@@ -132,6 +132,22 @@ dotnet publish ScreenTask/ScreenTask.csproj -c Release -r win-x64 --self-contain
 
 ## Architecture Notes
 
+### Optional WebRTC video
+
+* Settings can select WebRTC/H.264 alongside the default JPEG/WebSocket mode.
+  Keep per-viewer JPEG fallback, PIN enforcement and legacy WebSocket framing.
+  Audio remains on the existing PCM WebSocket channel.
+* Native video uses libdatachannel 0.24.6 and Media Foundation, with one shared
+  encoder and UDP on the selected TCP port number. Native callbacks must never
+  unwind managed exceptions across the ABI. Dispose peers/encoders off the UI
+  thread; revoke media immediately when removing a viewer.
+* Run `scripts/Prepare-WebRtcRuntime.ps1` before portable builds and retain
+  `WebRTC-NOTICE.txt` alongside `DirectX-NOTICE.txt` in packages. See
+  `docs/WEBRTC_MODE.md` for compatibility, measured tradeoffs and the synthetic
+  probe in `tools/StreamingProbe`.
+* After viewer edits run both Node test files in `ScreenTask.Tests/Web` as well
+  as the JavaScript syntax check. Static assets require rebuilding.
+
 ```mermaid
 flowchart TD
     subgraph Host["Host PC (ScreenTask.exe)"]

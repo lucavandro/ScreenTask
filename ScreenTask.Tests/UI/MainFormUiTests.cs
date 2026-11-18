@@ -17,6 +17,35 @@ namespace ScreenTask.Tests.UI
 {
     public class MainFormUiTests
     {
+        [Theory]
+        [InlineData("WebRtc", 1)]
+        [InlineData("future-mode", 0)]
+        public void MainForm_StreamingMode_LoadsSafelyAndPreservesJpegQuality(string mode, int expectedIndex)
+        {
+            RunInSta(() =>
+            {
+                using var form = CreateIsolatedForm();
+                // The fixture always supplies a settings path; the designer parents cbCloseToTray to its table.
+                var serializer = new System.Xml.Serialization.XmlSerializer(typeof(AppSettings));
+                using (var file = File.Create(form.CustomSettingsFilePath!))
+                    serializer.Serialize(file, new AppSettings { StreamingMode = mode, ImageQuality = 65 });
+                form.Show();
+                form.SelectTab(2);
+                Application.DoEvents();
+                Assert.True(form.cbCloseToTray.Bottom <= form.cbCloseToTray.Parent!.ClientSize.Height,
+                    "Adding video transport must not clip the startup checkboxes.");
+                Assert.Equal(expectedIndex, form.comboStreamingMode.SelectedIndex);
+                Assert.Equal(expectedIndex == 1, form.WebServer.PreferWebRtc);
+                Assert.Equal(expectedIndex == 0, form.qualitySlider.Enabled);
+                Assert.Equal(65, form.qualitySlider.Value);
+                form.comboStreamingMode.SelectedIndex = 1;
+                form.SaveSettings();
+                using var saved = File.OpenRead(form.CustomSettingsFilePath!);
+                var settings = Assert.IsType<AppSettings>(serializer.Deserialize(saved));
+                Assert.Equal("WebRtc", settings.StreamingMode);
+                Assert.Equal(65, settings.ImageQuality);
+            });
+        }
         [Fact]
         public void MainForm_InitializesWithCompact3TabNativeLayout()
         {

@@ -86,6 +86,7 @@ namespace ScreenTask
             _broadcaster = new StreamBroadcaster(80);
             _captureEngine = new ScreenCaptureEngine(_broadcaster);
             _webServer = new EmbeddedWebServer(_broadcaster, _captureEngine);
+            InitializeStreamingMode();
 
             _statsTimer.Tick += OnStatsTimerTick;
             _deviceChangeTimer.Tick += (s, e) =>
@@ -828,7 +829,9 @@ namespace ScreenTask
             btnFirewallRule.Enabled = false;
             try
             {
+                bool includeUdp = _webServer.PreferWebRtc;
                 bool exists = await FirewallHelper.RuleExistsAsync(port);
+                if (includeUdp) exists &= await FirewallHelper.RuleExistsAsync(port, udp: true);
                 if (exists)
                 {
                     Log($"Windows Firewall rule for port {port} is already configured.");
@@ -843,14 +846,14 @@ namespace ScreenTask
                     return;
                 }
 
-                bool added = await FirewallHelper.TryAddRuleAsync(port);
+                bool added = await FirewallHelper.TryAddRuleAsync(port, includeUdp);
                 if (added)
                 {
-                    Log($"Added Windows Firewall inbound rule for TCP port {port}.");
+                    Log($"Added Windows Firewall inbound rules for {(includeUdp ? "TCP + UDP" : "TCP")} port {port}.");
                     if (!SuppressModalDialogsForTesting)
                     {
                         MessageBox.Show(this,
-                            $"Successfully added Windows Defender Firewall rule for TCP port {port}.",
+                            $"Added Windows Defender Firewall rules for {(includeUdp ? "TCP + UDP" : "TCP")} port {port}. Check the indicator for the effective policy.",
                             "Firewall Rule Added",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
@@ -1108,6 +1111,9 @@ namespace ScreenTask
 
                 comboIPs.Enabled = false;
                 numPort.Enabled = false;
+                comboStreamingMode.Enabled = false;
+                if (_webServer.PreferWebRtc)
+                    Log(_broadcaster.WebRtcEnabled ? $"WebRTC enabled: {_broadcaster.WebRtcEncoder}; UDP port {port}." : _broadcaster.WebRtcUnavailableReason ?? "WebRTC unavailable; using JPEG.");
                 btnFreeze.Enabled = true;
 
                 monitorPreview.IsLive = true;
@@ -1159,6 +1165,7 @@ namespace ScreenTask
 
                 comboIPs.Enabled = true;
                 numPort.Enabled = true;
+                comboStreamingMode.Enabled = true;
                 btnFreeze.Enabled = false;
                 btnFreeze.Text = "Freeze Screen";
 
@@ -1606,6 +1613,7 @@ namespace ScreenTask
                     txtPassword.Enabled = cbPrivate.Checked;
                     numPort.Value = Math.Clamp(_currentSettings.Port, 1, 65535);
                     qualitySlider.Value = Math.Clamp(_currentSettings.ImageQuality, 20, 100);
+                    comboStreamingMode.SelectedIndex = string.Equals(_currentSettings.StreamingMode, "WebRtc", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
                     UpdateQualityLabel();
 
                     int fpsIdx = _currentSettings.TargetFps switch
@@ -1674,6 +1682,7 @@ namespace ScreenTask
                 _currentSettings.IsStartMinimizedEnabled = cbMiniStart.Checked;
                 _currentSettings.IsCloseToTrayEnabled = cbCloseToTray.Checked;
                 _currentSettings.ImageQuality = qualitySlider.Value;
+                _currentSettings.StreamingMode = comboStreamingMode.SelectedIndex == 1 ? "WebRtc" : "Jpeg";
                 _currentSettings.TargetFps = comboFps.SelectedIndex switch
                 {
                     0 => 15,

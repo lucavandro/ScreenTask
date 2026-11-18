@@ -23,7 +23,16 @@ public partial class frmMain
     }
 
     private FirewallEndpoint? GetFirewallEndpoint() => comboIPs.SelectedIndex >= 0 && comboIPs.SelectedIndex < _adapters.Count
-        ? new(_adapters[comboIPs.SelectedIndex].IpAddress, (int)numPort.Value, Environment.ProcessPath ?? "") : null;
+        ? new(_adapters[comboIPs.SelectedIndex].IpAddress, (int)numPort.Value, Environment.ProcessPath ?? "", 6,
+            _webServer.IsRunning ? _broadcaster.WebRtcEnabled : _webServer.PreferWebRtc) : null;
+
+    private async Task<FirewallPortStatus> InspectFirewallAsync(FirewallEndpoint endpoint)
+    {
+        var tcp = await FirewallStatusProvider(endpoint);
+        if (!endpoint.IncludeUdp) return tcp;
+        var udp = await FirewallStatusProvider(endpoint with { Protocol = 17 });
+        return FirewallPolicyEvaluator.CombineTcpUdp(tcp, udp);
+    }
 
     internal async Task RefreshFirewallStatusAsync()
     {
@@ -48,7 +57,7 @@ public partial class frmMain
                 var endpoint = GetFirewallEndpoint();
                 if (endpoint == null) return;
                 FirewallPortStatus status;
-                try { status = await FirewallStatusProvider(endpoint).WaitAsync(TimeSpan.FromSeconds(5)); }
+                try { status = await InspectFirewallAsync(endpoint).WaitAsync(TimeSpan.FromSeconds(5)); }
                 catch (TimeoutException) { status = new(FirewallPortState.Unknown, "Windows Firewall inspection timed out."); }
                 catch { status = new(FirewallPortState.Unknown, "Windows Firewall status could not be read."); }
                 if (IsDisposed || Disposing || _isShuttingDown) return;
@@ -77,7 +86,7 @@ public partial class frmMain
             FirewallPortState.Unknown => DesktopTheme.Warning,
             _ => SystemColors.GrayText
         };
-        statusLabelFirewall.ToolTipText = $"{endpoint.Address}:{endpoint.Port} (TCP)\n{status.Detail}\n" +
+        statusLabelFirewall.ToolTipText = $"{endpoint.Address}:{endpoint.Port} ({(endpoint.IncludeUdp ? "TCP + UDP" : "TCP")})\n{status.Detail}\n" +
             "Windows Firewall policy only; Wi-Fi/router and third-party filters are not tested. Click for firewall settings.";
         statusLabelFirewall.AccessibleDescription = statusLabelFirewall.ToolTipText;
     }

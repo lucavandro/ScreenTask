@@ -62,9 +62,11 @@
     <div id="zoomHud" class="zoom-hud">100%</div>
 
     <canvas id="screenCanvas"></canvas>
+    <video id="rtcVideo" class="hidden" autoplay muted playsinline disablepictureinpicture></video>
 
     <!-- Floating Overlay Controls -->
     <div class="floating-toolbar">
+      <div class="stat-tag"><span id="transportValue">JPEG</span></div>
       <div class="stat-tag">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
         <span id="fpsValue">0 FPS</span>

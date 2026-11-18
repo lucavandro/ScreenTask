@@ -4,6 +4,7 @@ Run these commands from the repository root on Windows with the .NET 9 SDK.
 The self-contained x64 build includes .NET and can run without installation:
 
 ```powershell
+./scripts/Prepare-WebRtcRuntime.ps1
 dotnet publish ScreenTask/ScreenTask.csproj -c Release -r win-x64 --self-contained true `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:DebugType=None -p:DebugSymbols=false -o build/portable-win-x64
@@ -27,3 +28,7 @@ Generated binaries and ZIPs stay under the ignored `build/` directory. Git track
 the sources and instructions, not the portable executable or local build output.
 Once the GPU capture dependency is present, its `DirectX-NOTICE.txt` is copied by
 the project into the publish folder and must remain in the distributed package.
+
+`WebRTC-NOTICE.txt` is also copied into publish output and must accompany the
+executable. The preparation script above embeds the app-local VC++ fallback for
+clean PCs; see [WebRTC runtime details](WEBRTC_MODE.md).

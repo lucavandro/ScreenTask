@@ -17,6 +17,42 @@ namespace ScreenTask.Tests.Integration
 {
     public class EmbeddedWebServerIntegrationTests : IAsyncLifetime
     {
+        [Fact]
+        public async Task WebRtcCapableViewer_OnJpegHost_ReceivesConfigAndCanUseFragmentedControls()
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var ws = new ClientWebSocket();
+            await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{_testPort}/stream/ws?webrtc=1"), timeout.Token);
+            var buffer = new byte[4096];
+            var config = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), timeout.Token);
+            Assert.Equal(WebSocketMessageType.Text, config.MessageType);
+            using (var json = JsonDocument.Parse(buffer.AsMemory(0, config.Count)))
+                Assert.Equal("jpeg", json.RootElement.GetProperty("videoMode").GetString());
+            await ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes("{\"type\":\"ping\",")), WebSocketMessageType.Text, false, timeout.Token);
+            await ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes("\"t\":123}")), WebSocketMessageType.Text, true, timeout.Token);
+            var pong = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), timeout.Token);
+            Assert.Contains("pong", Encoding.UTF8.GetString(buffer, 0, pong.Count));
+            using var bitmap = new Bitmap(10, 10);
+            await _broadcaster.BroadcastBitmapAsync(bitmap);
+            var frame = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), timeout.Token);
+            Assert.Equal(WebSocketMessageType.Binary, frame.MessageType);
+            Assert.Equal(0x01, buffer[0]);
+            await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Done", timeout.Token);
+        }
+
+        [Fact]
+        public async Task WebRtcCapability_DoesNotBypassPinOrCreateSession()
+        {
+            _server.RequirePin = true;
+            _server.PinCode = "1234";
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var ws = new ClientWebSocket();
+            await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{_testPort}/stream/ws?webrtc=1&pin=wrong"), timeout.Token);
+            var result = await ws.ReceiveAsync(new ArraySegment<byte>(new byte[1024]), timeout.Token);
+            Assert.Equal(WebSocketMessageType.Close, result.MessageType);
+            Assert.Equal(WebSocketCloseStatus.PolicyViolation, ws.CloseStatus);
+            Assert.Empty(_broadcaster.ConnectedSessions);
+        }
         private readonly StreamBroadcaster _broadcaster;
         private readonly ScreenCaptureEngine _captureEngine;
         private readonly EmbeddedWebServer _server;

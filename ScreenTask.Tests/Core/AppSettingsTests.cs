@@ -16,6 +16,7 @@ namespace ScreenTask.Tests.Core
             Assert.Equal(7070, settings.Port);
             Assert.Equal(30, settings.TargetFps);
             Assert.Equal(80, settings.ImageQuality);
+            Assert.Equal("Jpeg", settings.StreamingMode);
             Assert.False(settings.IsPrivateSession);
             Assert.True(settings.IsShowMouseEnabled);
             Assert.False(settings.IsAudioEnabled);
@@ -35,6 +36,7 @@ namespace ScreenTask.Tests.Core
                 Port = 8088,
                 TargetFps = 60,
                 ImageQuality = 90,
+                StreamingMode = "WebRtc",
                 IsPrivateSession = true,
                 PinCode = "secret123",
                 IsShowMouseEnabled = false,
@@ -58,6 +60,7 @@ namespace ScreenTask.Tests.Core
             Assert.Equal(original.Port, deserialized.Port);
             Assert.Equal(original.TargetFps, deserialized.TargetFps);
             Assert.Equal(original.ImageQuality, deserialized.ImageQuality);
+            Assert.Equal(original.StreamingMode, deserialized.StreamingMode);
             Assert.Equal(original.IsPrivateSession, deserialized.IsPrivateSession);
             Assert.Equal(original.PinCode, deserialized.PinCode);
             Assert.Equal(original.IsShowMouseEnabled, deserialized.IsShowMouseEnabled);

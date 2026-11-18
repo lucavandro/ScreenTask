@@ -2,6 +2,8 @@
   // Elements
   const canvas = document.getElementById('screenCanvas');
   const ctx = canvas.getContext('2d', { alpha: false });
+  const rtcVideo = document.getElementById('rtcVideo');
+  const transportDisplay = document.getElementById('transportValue');
   const overlay = document.getElementById('overlayMessage');
   const overlayTitle = document.getElementById('overlayTitle');
   const overlayDesc = document.getElementById('overlayDesc');
@@ -396,12 +398,107 @@
     }
   }
 
+  let rtcPeer = null;
+  let rtcGeneration = 0;
+  let rtcWatchdog = null;
+  let rtcStatsTimer = null;
+
+  function resetWebRtc() {
+    rtcGeneration++;
+    clearTimeout(rtcWatchdog);
+    clearInterval(rtcStatsTimer);
+    rtcWatchdog = rtcStatsTimer = null;
+    if (rtcPeer) { try { rtcPeer.close(); } catch (e) {} }
+    rtcPeer = null;
+    if (rtcVideo) { rtcVideo.srcObject = null; rtcVideo.classList.add('hidden'); }
+    canvas.classList.remove('hidden');
+    if (transportDisplay) transportDisplay.textContent = 'JPEG';
+  }
+
+  function fallbackToJpeg(socket, reason, notify = true) {
+    if (wsVideo !== socket) return;
+    resetWebRtc();
+    if (notify && socket.readyState === WebSocket.OPEN) {
+      try { socket.send(JSON.stringify({ type: 'webrtc-fallback' })); } catch (e) {}
+    }
+    if (reason) showToast(reason);
+  }
+
+  async function startWebRtc(socket, sdp) {
+    if (wsVideo !== socket) return;
+    resetWebRtc();
+    const generation = rtcGeneration;
+    if (!rtcVideo || typeof RTCPeerConnection !== 'function') {
+      fallbackToJpeg(socket, 'WebRTC unavailable; using JPEG.');
+      return;
+    }
+    let peer;
+    try { peer = new RTCPeerConnection({ iceServers: [], bundlePolicy: 'max-bundle' }); }
+    catch (e) { fallbackToJpeg(socket, 'WebRTC unavailable; using JPEG.'); return; }
+    rtcPeer = peer;
+    if (transportDisplay) transportDisplay.textContent = 'WebRTC connecting…';
+    rtcWatchdog = setTimeout(() => {
+      if (rtcGeneration === generation) fallbackToJpeg(socket, 'No WebRTC video received; using JPEG.');
+    }, 10000);
+    peer.onconnectionstatechange = () => {
+      if (rtcGeneration === generation && ['failed', 'closed'].includes(peer.connectionState))
+        fallbackToJpeg(socket, 'WebRTC disconnected; using JPEG.');
+    };
+    peer.ontrack = async (event) => {
+      if (rtcGeneration !== generation) return;
+      rtcVideo.srcObject = event.streams[0] || new MediaStream([event.track]);
+      rtcVideo.muted = true;
+      try { await rtcVideo.play(); }
+      catch (e) { if (rtcGeneration === generation) fallbackToJpeg(socket, 'Video playback unavailable; using JPEG.'); return; }
+      if (rtcGeneration !== generation) return;
+      canvas.classList.add('hidden');
+      rtcVideo.classList.remove('hidden');
+      if (transportDisplay) transportDisplay.textContent = 'WebRTC · H.264';
+      let started = performance.now(), frames = 0, previousFrames = 0;
+      const update = (increment = 1) => {
+        if (rtcGeneration !== generation) return;
+        if (rtcVideo.videoWidth && rtcVideo.videoHeight) {
+          clearTimeout(rtcWatchdog);
+          resolutionDisplay.textContent = `${rtcVideo.videoWidth}x${rtcVideo.videoHeight}`;
+        }
+        frames += increment;
+        const now = performance.now();
+        if (now - started >= 1000) {
+          currentFps = Math.round(frames * 1000 / (now - started));
+          fpsDisplay.textContent = `${currentFps} FPS`;
+          started = now; frames = 0;
+        }
+        if (rtcVideo.requestVideoFrameCallback) rtcVideo.requestVideoFrameCallback(() => update());
+      };
+      if (rtcVideo.requestVideoFrameCallback) rtcVideo.requestVideoFrameCallback(() => update());
+      else rtcStatsTimer = setInterval(() => {
+        if (rtcGeneration !== generation) return;
+        const count = rtcVideo.getVideoPlaybackQuality?.().totalVideoFrames ?? previousFrames;
+        const received = Math.max(0, count - previousFrames); previousFrames = count; update(received);
+      }, 1000);
+    };
+    try {
+      await peer.setRemoteDescription({ type: 'offer', sdp });
+      await peer.setLocalDescription(await peer.createAnswer());
+      if (peer.iceGatheringState !== 'complete') await new Promise((resolve) => {
+        const timer = setTimeout(done, 2000);
+        function done() { clearTimeout(timer); peer.removeEventListener('icegatheringstatechange', changed); resolve(); }
+        function changed() { if (peer.iceGatheringState === 'complete') done(); }
+        peer.addEventListener('icegatheringstatechange', changed);
+      });
+      if (rtcGeneration === generation && wsVideo === socket && socket.readyState === WebSocket.OPEN)
+        socket.send(JSON.stringify({ type: 'webrtc-answer', sdp: peer.localDescription.sdp }));
+    } catch (e) { if (rtcGeneration === generation) fallbackToJpeg(socket, 'WebRTC negotiation failed; using JPEG.'); }
+  }
+
   // Connect WebSockets (Video + Audio)
   function connect() {
     resetVideoDecoder();
+    resetWebRtc();
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const pinParam = pin ? `?pin=${encodeURIComponent(pin)}` : '';
-    const videoWsUrl = `${protocol}//${location.host}/stream/ws${pinParam}`;
+    const supportsWebRtc = !!rtcVideo && typeof RTCPeerConnection === 'function';
+    const videoWsUrl = `${protocol}//${location.host}/stream/ws${pinParam}${supportsWebRtc ? (pinParam ? '&' : '?') + 'webrtc=1' : ''}`;
 
     if (wsVideo) {
       try { wsVideo.close(); } catch (e) {}
@@ -432,7 +529,13 @@
       if (typeof event.data === 'string') {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'pong' && typeof msg.t === 'number') {
+          if (msg.type === 'webrtc-offer' && typeof msg.sdp === 'string') {
+            void startWebRtc(videoSocket, msg.sdp);
+          } else if (msg.type === 'webrtc-fallback') {
+            fallbackToJpeg(videoSocket, msg.reason || 'Using JPEG.', false);
+          } else if (msg.type === 'stream-config' && msg.videoMode === 'jpeg') {
+            resetWebRtc();
+          } else if (msg.type === 'pong' && typeof msg.t === 'number') {
             currentRtt = Math.max(1, Math.round(performance.now() - msg.t));
             if (latencyDisplay) {
               latencyDisplay.textContent = `${currentRtt} ms`;
@@ -480,6 +583,7 @@
     wsVideo.onclose = (e) => {
       if (wsVideo !== videoSocket) return;
       resetVideoDecoder();
+      resetWebRtc();
       isConnected = false;
       stopTelemetryHeartbeat();
       if (wsAudio) {
@@ -673,8 +777,14 @@
   toolbar?.addEventListener('mouseleave', resetToolbarHideTimer);
 
   // Touch Zoom & Pan Handlers
+  function onVideoSurface(type, handler, options) {
+    canvas.addEventListener(type, handler, options);
+    rtcVideo?.addEventListener(type, handler, options);
+  }
+
   function applyTransform() {
     canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+    if (rtcVideo) rtcVideo.style.transform = canvas.style.transform;
     if (scale > 1) {
       zoomHud.style.display = 'block';
       zoomHud.textContent = `${Math.round(scale * 100)}%`;
@@ -694,7 +804,7 @@
   });
 
   // Mouse wheel zoom
-  canvas.addEventListener('wheel', (e) => {
+  onVideoSurface('wheel', (e) => {
     e.preventDefault();
     const zoomDelta = e.deltaY < 0 ? 1.15 : 0.85;
     scale = Math.min(Math.max(1, scale * zoomDelta), 5);
@@ -706,7 +816,7 @@
   }, { passive: false });
 
   // Mouse Drag to Pan
-  canvas.addEventListener('mousedown', (e) => {
+  onVideoSurface('mousedown', (e) => {
     if (scale > 1) {
       isDragging = true;
       startX = e.clientX - panX;
@@ -729,7 +839,7 @@
   // Touch Pinch-to-Zoom & Double-tap
   let lastTapTime = 0;
 
-  canvas.addEventListener('touchstart', (e) => {
+  onVideoSurface('touchstart', (e) => {
     if (e.touches.length === 2) {
       initialPinchDistance = getDistance(e.touches[0], e.touches[1]);
       initialScale = scale;
@@ -740,7 +850,7 @@
     }
   });
 
-  canvas.addEventListener('touchmove', (e) => {
+  onVideoSurface('touchmove', (e) => {
     if (e.touches.length === 2 && initialPinchDistance) {
       e.preventDefault();
       const currentDistance = getDistance(e.touches[0], e.touches[1]);
@@ -757,7 +867,7 @@
     }
   }, { passive: false });
 
-  canvas.addEventListener('touchend', (e) => {
+  onVideoSurface('touchend', (e) => {
     initialPinchDistance = null;
     isDragging = false;
 
@@ -829,6 +939,10 @@
   }
 
   function showPinModal() {
+    resetVideoDecoder();
+    resetWebRtc();
+    isConnected = false;
+    stopTelemetryHeartbeat();
     if (wsVideo) {
       try { wsVideo.close(); } catch (e) {}
       wsVideo = null;
@@ -926,6 +1040,10 @@
 
   // One-click Screenshot Capture
   function takeScreenshot() {
+    if (rtcPeer && rtcVideo?.videoWidth && rtcVideo?.videoHeight) {
+      canvas.width = rtcVideo.videoWidth; canvas.height = rtcVideo.videoHeight;
+      ctx.drawImage(rtcVideo, 0, 0);
+    }
     if (!canvas || canvas.width === 0 || canvas.height === 0) {
       showToast('⚠️ No video frame to capture');
       return;
