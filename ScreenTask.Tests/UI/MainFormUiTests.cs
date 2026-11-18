@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using ScreenTask;
 using ScreenTask.Core.Capture;
+using ScreenTask.Core.Network;
 using ScreenTask.UI;
 using Xunit;
 
@@ -336,7 +337,7 @@ namespace ScreenTask.Tests.UI
         }
 
         [Fact]
-        public void MainForm_StatusStrip_DisplaysStatsAndShortCopyright()
+        public void MainForm_StatusStrip_DisplaysStatsAndFirewallStatus()
         {
             RunInSta(() =>
             {
@@ -367,10 +368,11 @@ namespace ScreenTask.Tests.UI
                 Assert.NotNull(form.StatusLabelAudio);
                 Assert.Contains("Audio:", form.StatusLabelAudio.Text);
 
-                Assert.NotNull(form.StatusLabelCopyright);
-                Assert.Contains("© 2014-2026 Eslam Hamouda", form.StatusLabelCopyright.Text);
-                Assert.True(form.StatusLabelCopyright.IsLink);
-                Assert.Contains("screentask.eslamx.com", form.StatusLabelCopyright.ToolTipText);
+                Assert.NotNull(form.StatusLabelFirewall);
+                Assert.Contains("Firewall:", form.StatusLabelFirewall.Text);
+                Assert.False(form.StatusLabelFirewall.IsLink);
+                Assert.Contains("Windows Firewall", form.StatusLabelFirewall.ToolTipText);
+                Assert.DoesNotContain("©", form.StatusLabelFirewall.Text);
 
                 var cbAudio = FindControl<CheckBox>(form, "cbAudio");
                 Assert.NotNull(cbAudio);
@@ -737,6 +739,65 @@ namespace ScreenTask.Tests.UI
 
             Assert.True(frmMain.TryParseNormalizedVersion("v2.0.1-rc1", out var v201));
             Assert.True(v201 > v2Semantic);
+        }
+
+        [Fact]
+        public void MainForm_FirewallIndicator_DiscardsStaleResultsAfterPortChange()
+        {
+            RunInSta(() =>
+            {
+                using var form = CreateIsolatedForm();
+                var first = new TaskCompletionSource<FirewallPortStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var requests = new List<FirewallEndpoint>();
+                form.FirewallStatusProvider = endpoint =>
+                {
+                    requests.Add(endpoint);
+                    return requests.Count == 1 ? first.Task : Task.FromResult(new FirewallPortStatus(FirewallPortState.Blocked, "Test policy"));
+                };
+                form.Show();
+                Assert.Single(requests);
+                form.numPort.Value = 9193;
+                Assert.Contains("9193", form.StatusLabelFirewall.Text);
+                Assert.Contains("Checking", form.StatusLabelFirewall.Text);
+                first.SetResult(new(FirewallPortState.Allowed, "Old port was allowed"));
+                PumpUntil(() => form.StatusLabelFirewall.Text?.Contains("Blocked") == true);
+                Assert.Equal(9193, requests.Last().Port);
+                Assert.Contains("9193", form.StatusLabelFirewall.Text);
+                Assert.DoesNotContain("Old port", form.StatusLabelFirewall.ToolTipText);
+                form.StatusLabelFirewall.PerformClick();
+                Assert.Equal(2, form.SelectedTabIndex);
+            });
+        }
+
+        [Fact]
+        public void MainForm_FirewallIndicator_ReadFailureIsUnknown_AndDisposalDoesNotWait()
+        {
+            RunInSta(() =>
+            {
+                using var form = CreateIsolatedForm();
+                form.FirewallStatusProvider = endpoint => throw new InvalidOperationException("Policy unavailable");
+                form.Show();
+                Assert.Contains("Unknown", form.StatusLabelFirewall.Text);
+                var pending = new TaskCompletionSource<FirewallPortStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+                form.FirewallStatusProvider = endpoint => pending.Task;
+                var refresh = form.RefreshFirewallStatusAsync();
+                Assert.False(refresh.IsCompleted);
+                form.Dispose();
+                pending.SetResult(new(FirewallPortState.Allowed, "Completed after disposal"));
+                PumpUntil(() => refresh.IsCompleted);
+                refresh.GetAwaiter().GetResult();
+            });
+        }
+
+        private static void PumpUntil(Func<bool> condition)
+        {
+            var timeout = System.Diagnostics.Stopwatch.StartNew();
+            while (!condition() && timeout.Elapsed < TimeSpan.FromSeconds(4))
+            {
+                Application.DoEvents();
+                Thread.Sleep(5);
+            }
+            Assert.True(condition(), "Firewall refresh did not complete in time");
         }
 
         [ThreadStatic]

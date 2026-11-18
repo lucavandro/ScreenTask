@@ -60,7 +60,7 @@ namespace ScreenTask
         public ToolStripStatusLabel StatusLabelData => statusLabelData;
         public ToolStripStatusLabel StatusLabelUptime => statusLabelUptime;
         public ToolStripStatusLabel StatusLabelAudio => statusLabelAudio;
-        public ToolStripStatusLabel StatusLabelCopyright => statusLabelCopyright;
+        public ToolStripStatusLabel StatusLabelFirewall => statusLabelFirewall;
 
         public bool SuppressModalDialogsForTesting { get; set; }
         public AppSettings CurrentSettings => _currentSettings;
@@ -103,6 +103,7 @@ namespace ScreenTask
             WireEvents();
             WireMenuEvents();
             InitializeTrayContextMenu();
+            InitializeFirewallIndicator();
         }
 
         private void WireEvents()
@@ -271,7 +272,6 @@ namespace ScreenTask
             };
 
             statusLabelViewers.Click += (s, e) => SelectTab(1);
-            statusLabelCopyright.Click += statusLabelCopyright_Click;
             appNotify.Click += appNotify_Click;
             appNotify.MouseDoubleClick += (s, e) => RestoreFromTray();
         }
@@ -420,7 +420,6 @@ namespace ScreenTask
             statusLabelData.Text = "0.0 MB";
             statusLabelUptime.Text = "00:00:00";
             statusLabelAudio.Text = cbAudio.Checked ? "Audio: On" : "Audio: Off";
-            statusLabelCopyright.Text = "© 2014-2026 Eslam Hamouda";
 
             if (_currentSettings.IsStartMinimizedEnabled)
             {
@@ -836,8 +835,8 @@ namespace ScreenTask
                     if (!SuppressModalDialogsForTesting)
                     {
                         MessageBox.Show(this,
-                            $"Windows Defender Firewall already allows inbound connections on TCP port {port}.",
-                            "Firewall Rule Active",
+                            $"A Windows Firewall rule named Screen Task On Port {port} already exists. Check the firewall indicator for its applicability to the selected network and port.",
+                            "Firewall Rule Exists",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
                     }
@@ -869,6 +868,7 @@ namespace ScreenTask
             finally
             {
                 btnFirewallRule.Enabled = true;
+                await RefreshFirewallStatusAsync();
             }
         }
 
@@ -1427,6 +1427,7 @@ namespace ScreenTask
             {
                 txtURL.Text = $"http://127.0.0.1:{numPort.Value}";
             }
+            _ = RefreshFirewallStatusAsync();
         }
 
         public void Log(string message)
@@ -1745,15 +1746,6 @@ namespace ScreenTask
             {
                 RestoreFromTray();
             }
-        }
-
-        private void statusLabelCopyright_Click(object? sender, EventArgs e)
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo(Constants.WebsiteUrl) { UseShellExecute = true });
-            }
-            catch { }
         }
 
         private async Task CheckForUpdatesAsync(bool manualCheck = false)

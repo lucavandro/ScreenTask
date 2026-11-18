@@ -174,7 +174,7 @@ namespace ScreenTask
             statusLabelData = new ToolStripStatusLabel();
             statusLabelUptime = new ToolStripStatusLabel();
             statusLabelAudio = new ToolStripStatusLabel();
-            statusLabelCopyright = new ToolStripStatusLabel();
+            statusLabelFirewall = new ToolStripStatusLabel();
             appNotify = new NotifyIcon(components);
             trayContextMenu = new ContextMenuStrip(components);
             toolTipMain = new ToolTip(components);
@@ -1744,7 +1744,7 @@ namespace ScreenTask
             // statusStripMain
             // 
             statusStripMain.ImageScalingSize = new Size(24, 24);
-            statusStripMain.Items.AddRange(new ToolStripItem[] { statusLabelServer, statusLabelViewers, statusLabelFps, statusLabelData, statusLabelUptime, statusLabelAudio, statusLabelCopyright });
+            statusStripMain.Items.AddRange(new ToolStripItem[] { statusLabelServer, statusLabelViewers, statusLabelFps, statusLabelData, statusLabelUptime, statusLabelAudio, statusLabelFirewall });
             statusStripMain.Location = new Point(0, 897);
             statusStripMain.Name = "statusStripMain";
             statusStripMain.Padding = new Padding(1, 0, 20, 0);
@@ -1801,15 +1801,16 @@ namespace ScreenTask
             statusLabelAudio.Size = new Size(99, 29);
             statusLabelAudio.Text = "Audio: Off";
             // 
-            // statusLabelCopyright
+            // statusLabelFirewall
             // 
-            statusLabelCopyright.BorderSides = ToolStripStatusLabelBorderSides.Left;
-            statusLabelCopyright.BorderStyle = Border3DStyle.Etched;
-            statusLabelCopyright.IsLink = true;
-            statusLabelCopyright.Name = "statusLabelCopyright";
-            statusLabelCopyright.Size = new Size(259, 29);
-            statusLabelCopyright.Text = "© 2014-2026 Eslam Hamouda";
-            statusLabelCopyright.ToolTipText = "ScreenTask 2.0 • Free & Open Source under GPLv3 • screentask.eslamx.com";
+            statusLabelFirewall.BorderSides = ToolStripStatusLabelBorderSides.Left;
+            statusLabelFirewall.BorderStyle = Border3DStyle.Etched;
+            statusLabelFirewall.IsLink = false;
+            statusLabelFirewall.AccessibleName = "Windows Firewall port status";
+            statusLabelFirewall.Name = "statusLabelFirewall";
+            statusLabelFirewall.Size = new Size(259, 29);
+            statusLabelFirewall.Text = "● Firewall: Checking...";
+            statusLabelFirewall.ToolTipText = "Checking Windows Firewall for the selected TCP port. Click for firewall settings.";
             // 
             // appNotify
             // 
@@ -2065,7 +2066,7 @@ namespace ScreenTask
         internal System.Windows.Forms.ToolStripStatusLabel statusLabelData;
         internal System.Windows.Forms.ToolStripStatusLabel statusLabelUptime;
         internal System.Windows.Forms.ToolStripStatusLabel statusLabelAudio;
-        internal System.Windows.Forms.ToolStripStatusLabel statusLabelCopyright;
+        internal System.Windows.Forms.ToolStripStatusLabel statusLabelFirewall;
         private System.Windows.Forms.NotifyIcon appNotify;
         private System.Windows.Forms.ToolTip toolTipMain;
         private System.Windows.Forms.ContextMenuStrip trayContextMenu;
