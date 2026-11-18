@@ -70,6 +70,8 @@ namespace ScreenTask
         {
             InitializeComponent();
             statusStripMain.ShowItemToolTips = true;
+            toolTipMain.SetToolTip(qualitySlider,
+                "JPEG quality: lower values reduce detail and bandwidth. They may improve FPS when encoding or the network is the bottleneck; capture speed and resolution are unchanged.");
 
             // Prevent pre-autoscale MaxWindowTrackSize clamping on 96-DPI displays (e.g., 1024x768 or 1366x768)
             // from double-shrinking ClientSize when Designer coordinates are stored at 150% DPI (10x25).
