@@ -1,0 +1,17 @@
+{
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+  "hardwareConcurrency": 16,
+  "width": 1920,
+  "height": 1080,
+  "numericQuality": 75,
+  "method": "Production-encoded synthetic frames; three alternating codec-order rounds; five warmups plus ten measured decodes per codec per round; createImageBitmap followed by Canvas drawImage and bitmap.close.",
+  "limitations": "Desktop browser; no Android hardware, Wi-Fi, display presentation latency or visual-quality equivalence measured. Summary transcribed from browser tool output; raw per-sample values are present in the tool log.",
+  "results": [
+    { "scene": "slide", "codec": "JPEG", "samples": 30, "decodeP50Ms": 13.2, "decodeP95Ms": 16.5, "decodeAndCanvasP50Ms": 13.2, "decodeAndCanvasP95Ms": 16.5 },
+    { "scene": "slide", "codec": "WebP", "samples": 30, "decodeP50Ms": 17.4, "decodeP95Ms": 20.0, "decodeAndCanvasP50Ms": 17.4, "decodeAndCanvasP95Ms": 20.1 },
+    { "scene": "code", "codec": "JPEG", "samples": 30, "decodeP50Ms": 17.8, "decodeP95Ms": 19.8, "decodeAndCanvasP50Ms": 17.8, "decodeAndCanvasP95Ms": 19.9 },
+    { "scene": "code", "codec": "WebP", "samples": 30, "decodeP50Ms": 48.7, "decodeP95Ms": 50.2, "decodeAndCanvasP50Ms": 48.7, "decodeAndCanvasP95Ms": 50.2 },
+    { "scene": "photo-like", "codec": "JPEG", "samples": 30, "decodeP50Ms": 19.1, "decodeP95Ms": 21.3, "decodeAndCanvasP50Ms": 19.1, "decodeAndCanvasP95Ms": 21.5 },
+    { "scene": "photo-like", "codec": "WebP", "samples": 30, "decodeP50Ms": 57.5, "decodeP95Ms": 59.8, "decodeAndCanvasP50Ms": 57.6, "decodeAndCanvasP95Ms": 59.9 }
+  ]
+}

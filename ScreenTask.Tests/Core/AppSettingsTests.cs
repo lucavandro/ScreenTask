@@ -105,6 +105,22 @@ namespace ScreenTask.Tests.Core
             Assert.Equal("", deserialized.SelectedAudioDeviceId);
         }
 
+        [Theory]
+        [InlineData("WebP")]
+        [InlineData("Jpeg")]
+        public void RemovedVideoFormat_IsIgnoredWithoutLosingOtherSettings(string oldFormat)
+        {
+            var serializer = new XmlSerializer(typeof(AppSettings));
+            using var input = new StringReader($"<AppSettings><VideoFormat>{oldFormat}</VideoFormat><Port>9292</Port><ImageQuality>65</ImageQuality><PinCode>1234</PinCode></AppSettings>");
+            var settings = Assert.IsType<AppSettings>(serializer.Deserialize(input));
+            Assert.Equal(9292, settings.Port);
+            Assert.Equal(65, settings.ImageQuality);
+            Assert.Equal("1234", settings.PinCode);
+            using var output = new StringWriter();
+            serializer.Serialize(output, settings);
+            Assert.DoesNotContain("VideoFormat", output.ToString());
+        }
+
         [Fact]
         public void MinimizeToTrayAlias_SynchronizesWithCloseToTray()
         {

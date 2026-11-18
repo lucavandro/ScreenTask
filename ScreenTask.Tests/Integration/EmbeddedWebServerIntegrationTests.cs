@@ -188,6 +188,29 @@ namespace ScreenTask.Tests.Integration
         }
 
         [Fact]
+        public async Task ObsoleteCodecQuery_ReturnsJpegAndPreservesPinAndSnapshot()
+        {
+            _server.RequirePin = true;
+            _server.PinCode = "1234";
+            using var previousViewer = new ClientWebSocket();
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            // Cached viewers can still include the removed capability query.
+            await previousViewer.ConnectAsync(new Uri($"ws://127.0.0.1:{_testPort}/stream/ws?webp=1&pin=1234"), timeout.Token);
+            while (_broadcaster.ConnectedClientsCount == 0) await Task.Delay(10, timeout.Token);
+            using var bitmap = new Bitmap(32, 24);
+            await _broadcaster.BroadcastBitmapAsync(bitmap);
+            var buffer = new byte[4096];
+            var frame = await previousViewer.ReceiveAsync(new ArraySegment<byte>(buffer), timeout.Token);
+            Assert.Equal(0x01, buffer[0]);
+            Assert.Equal(0xFF, buffer[1]);
+            Assert.Equal(0xD8, buffer[2]);
+            Assert.True(frame.EndOfMessage);
+            var snapshot = await _http.GetByteArrayAsync($"http://127.0.0.1:{_testPort}/ScreenTask.jpg", timeout.Token);
+            Assert.Equal(snapshot, buffer.AsSpan(1, frame.Count - 1).ToArray());
+            await previousViewer.CloseAsync(WebSocketCloseStatus.NormalClosure, "Done", timeout.Token);
+        }
+
+        [Fact]
         public async Task PinAuthentication_RejectsInvalidAndAcceptsValidPin()
         {
             _server.RequirePin = true;

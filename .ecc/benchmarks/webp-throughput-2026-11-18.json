@@ -1,0 +1,182 @@
+{
+  "throughput": [
+    {
+      "scene": "slide",
+      "bandwidthMbps": 10,
+      "codec": "Jpeg",
+      "elapsedSeconds": 3.0180686,
+      "sentFrames": 29,
+      "completedFps": 9.608794180490133,
+      "droppedFrames": 55
+    },
+    {
+      "scene": "slide",
+      "bandwidthMbps": 10,
+      "codec": "WebP",
+      "elapsedSeconds": 3.0060314,
+      "sentFrames": 37,
+      "completedFps": 12.308587328795035,
+      "droppedFrames": 0
+    },
+    {
+      "scene": "slide",
+      "bandwidthMbps": 30,
+      "codec": "Jpeg",
+      "elapsedSeconds": 3.0208335,
+      "sentFrames": 67,
+      "completedFps": 22.179309121141564,
+      "droppedFrames": 16
+    },
+    {
+      "scene": "slide",
+      "bandwidthMbps": 30,
+      "codec": "WebP",
+      "elapsedSeconds": 3.0733512,
+      "sentFrames": 38,
+      "completedFps": 12.364353283152282,
+      "droppedFrames": 0
+    },
+    {
+      "scene": "slide",
+      "bandwidthMbps": 100,
+      "codec": "Jpeg",
+      "elapsedSeconds": 3.0057327,
+      "sentFrames": 85,
+      "completedFps": 28.2792944296078,
+      "droppedFrames": 0
+    },
+    {
+      "scene": "slide",
+      "bandwidthMbps": 100,
+      "codec": "WebP",
+      "elapsedSeconds": 3.0439734,
+      "sentFrames": 38,
+      "completedFps": 12.483683333106656,
+      "droppedFrames": 0
+    },
+    {
+      "scene": "code",
+      "bandwidthMbps": 10,
+      "codec": "Jpeg",
+      "elapsedSeconds": 3.0026689,
+      "sentFrames": 9,
+      "completedFps": 2.9973334722319867,
+      "droppedFrames": 75
+    },
+    {
+      "scene": "code",
+      "bandwidthMbps": 10,
+      "codec": "WebP",
+      "elapsedSeconds": 3.0698548,
+      "sentFrames": 11,
+      "completedFps": 3.5832313632553565,
+      "droppedFrames": 11
+    },
+    {
+      "scene": "code",
+      "bandwidthMbps": 30,
+      "codec": "Jpeg",
+      "elapsedSeconds": 3.020886,
+      "sentFrames": 23,
+      "completedFps": 7.613660363217943,
+      "droppedFrames": 61
+    },
+    {
+      "scene": "code",
+      "bandwidthMbps": 30,
+      "codec": "WebP",
+      "elapsedSeconds": 3.1073538,
+      "sentFrames": 22,
+      "completedFps": 7.079979112774349,
+      "droppedFrames": 0
+    },
+    {
+      "scene": "code",
+      "bandwidthMbps": 100,
+      "codec": "Jpeg",
+      "elapsedSeconds": 3.024912,
+      "sentFrames": 50,
+      "completedFps": 16.52940647529581,
+      "droppedFrames": 34
+    },
+    {
+      "scene": "code",
+      "bandwidthMbps": 100,
+      "codec": "WebP",
+      "elapsedSeconds": 3.1054011,
+      "sentFrames": 22,
+      "completedFps": 7.084431057875261,
+      "droppedFrames": 0
+    },
+    {
+      "scene": "photo-like",
+      "bandwidthMbps": 10,
+      "codec": "Jpeg",
+      "elapsedSeconds": 3.0164578,
+      "sentFrames": 10,
+      "completedFps": 3.3151466597676253,
+      "droppedFrames": 72
+    },
+    {
+      "scene": "photo-like",
+      "bandwidthMbps": 10,
+      "codec": "WebP",
+      "elapsedSeconds": 3.1002137,
+      "sentFrames": 8,
+      "completedFps": 2.580467275530071,
+      "droppedFrames": 14
+    },
+    {
+      "scene": "photo-like",
+      "bandwidthMbps": 30,
+      "codec": "Jpeg",
+      "elapsedSeconds": 3.0215444,
+      "sentFrames": 27,
+      "completedFps": 8.935827651581093,
+      "droppedFrames": 57
+    },
+    {
+      "scene": "photo-like",
+      "bandwidthMbps": 30,
+      "codec": "WebP",
+      "elapsedSeconds": 3.0933106,
+      "sentFrames": 22,
+      "completedFps": 7.112121233477168,
+      "droppedFrames": 0
+    },
+    {
+      "scene": "photo-like",
+      "bandwidthMbps": 100,
+      "codec": "Jpeg",
+      "elapsedSeconds": 3.0006206,
+      "sentFrames": 57,
+      "completedFps": 18.996070346247706,
+      "droppedFrames": 26
+    },
+    {
+      "scene": "photo-like",
+      "bandwidthMbps": 100,
+      "codec": "WebP",
+      "elapsedSeconds": 3.0981039,
+      "sentFrames": 22,
+      "completedFps": 7.101117557742334,
+      "droppedFrames": 0
+    }
+  ],
+  "mixed": [
+    {
+      "codec": "Jpeg",
+      "p50Ms": 11.5236,
+      "p95Ms": 16.3936,
+      "modernPacketBytes": 370668,
+      "legacyPacketBytes": 370668
+    },
+    {
+      "codec": "WebP",
+      "p50Ms": 143.2377,
+      "p95Ms": 150.5781,
+      "modernPacketBytes": 285137,
+      "legacyPacketBytes": 370668
+    }
+  ]
+}
