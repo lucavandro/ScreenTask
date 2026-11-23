@@ -2,9 +2,9 @@
 
 [![Website](https://img.shields.io/badge/Website-screentask.eslamx.com-4f46e5?style=flat-square)](https://screentask.eslamx.com/)
 [![Build & Test](https://img.shields.io/github/actions/workflow/status/lucavandro/ScreenTask/ci.yml?branch=master&style=flat-square&label=CI%20Build)](https://github.com/lucavandro/ScreenTask/actions/workflows/ci.yml)
-[![Latest Release](https://img.shields.io/github/v/release/EslaMx7/ScreenTask?style=flat-square&color=10b981)](https://github.com/EslaMx7/ScreenTask/releases/latest)
-[![Total Downloads](https://img.shields.io/github/downloads/EslaMx7/ScreenTask/total?style=flat-square&color=0ea5e9&label=Total%20Downloads)](https://github.com/EslaMx7/ScreenTask/releases)
-[![Latest Release Downloads](https://img.shields.io/github/downloads/EslaMx7/ScreenTask/latest/total?style=flat-square&color=6366f1&label=Latest%20Release%20Downloads)](https://github.com/EslaMx7/ScreenTask/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/lucavandro/ScreenTask?style=flat-square&color=10b981)](https://github.com/lucavandro/ScreenTask/releases/latest)
+[![Total Downloads](https://img.shields.io/github/downloads/lucavandro/ScreenTask/total?style=flat-square&color=0ea5e9&label=Total%20Downloads)](https://github.com/lucavandro/ScreenTask/releases)
+[![Latest Release Downloads](https://img.shields.io/github/downloads/lucavandro/ScreenTask/latest/total?style=flat-square&color=6366f1&label=Latest%20Release%20Downloads)](https://github.com/lucavandro/ScreenTask/releases/latest)
 [![GitHub Stars](https://img.shields.io/github/stars/EslaMx7/ScreenTask?style=flat-square&color=yellow)](https://github.com/EslaMx7/ScreenTask/stargazers)
 [![Built with .NET](https://img.shields.io/badge/.NET-9.0-512bd4?style=flat-square&logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0.html)
@@ -19,8 +19,8 @@ WebRTC alongside the default JPEG/WebSocket mode, with per-viewer JPEG fallback.
 See [setup, compatibility and measured tradeoffs](docs/WEBRTC_MODE.md).
 
 The current source release is **2.1.0** (tag **v2.1.0**). This checkout includes the capture, performance, desktop and web-viewer updates
-described below. The CI badge tracks this repository; release, download and
-popularity badges refer to the original upstream project.
+described below. The CI, release and download badges track this repository;
+the stars badge refers to the original upstream project.
 
 🌐 **Official Website**: [https://screentask.eslamx.com/](https://screentask.eslamx.com/) · 🚀 **What's New in 2.0**: [https://screentask.eslamx.com/v2](https://screentask.eslamx.com/v2) · 📦 **Legacy v1.2 Archive**: [https://screentask.eslamx.com/v1](https://screentask.eslamx.com/v1)
 
@@ -33,17 +33,20 @@ firewall indicator and video-transport selector.
 
 ## 📥 Direct Downloads
 
-These links point to the **original upstream releases**. For the changes in this
-checkout, use a package built from this repository or follow the
-[portable build instructions](#portable-windows-x64-builds). Do not assume an
-upstream v2.0 binary contains the improvements documented here.
+Download **ScreenTask 2.1.0 from this repository** below, or open the
+[latest release](https://github.com/lucavandro/ScreenTask/releases/latest) and expand
+**Assets**. Choose the standalone EXE if you do not want to install .NET.
+The automatic source-code ZIP/TAR archives do not contain a compiled application.
 
-| Upstream edition | Requirements | Download |
+| Edition | Requirements | Download |
 | :--- | :--- | :--- |
-| **ScreenTask 2.0 Standalone `.EXE`** | Windows 10/11 x64; .NET included | [Standalone .EXE](https://github.com/EslaMx7/ScreenTask/releases/download/v2.0/ScreenTask-v2.0-win-x64-standalone.exe) |
-| **ScreenTask 2.0 Lightweight Portable `.ZIP`** | Windows 10/11 x64; the release's required .NET 9 runtimes | [Portable .ZIP](https://github.com/EslaMx7/ScreenTask/releases/download/v2.0/ScreenTask-v2.0-win-x64-portable.zip) |
-| **SHA-256 checksums** | Verify the matching upstream release files | [SHA256SUMS.txt](https://github.com/EslaMx7/ScreenTask/releases/download/v2.0/SHA256SUMS.txt) |
+| **ScreenTask 2.1.0 Standalone `.EXE`** | Windows 10/11 x64; .NET included | [Standalone .EXE](https://github.com/lucavandro/ScreenTask/releases/download/v2.1.0/ScreenTask-v2.1.0-win-x64-standalone.exe) |
+| **ScreenTask 2.1.0 Lightweight Portable `.ZIP`** | Windows 10/11 x64; .NET 9 Desktop Runtime and ASP.NET Core Runtime 9 | [Portable .ZIP](https://github.com/lucavandro/ScreenTask/releases/download/v2.1.0/ScreenTask-v2.1.0-win-x64-portable.zip) |
+| **SHA-256 checksums** | Verify the matching release files | [SHA256SUMS.txt](https://github.com/lucavandro/ScreenTask/releases/download/v2.1.0/SHA256SUMS.txt) |
 | **ScreenTask v1.2 Classic** | Legacy Windows / 32-bit archive | [Legacy archive](https://screentask.eslamx.com/v1) |
+
+Original upstream versions remain available in the
+[upstream releases](https://github.com/EslaMx7/ScreenTask/releases).
 
 ---
 
@@ -221,7 +224,7 @@ H.264 is always faster.
 
 ### 1. Host (Sharing your screen)
 
-1. Obtain a Windows x64 package built from this checkout for the features described here. Original upstream binaries are linked in [Direct Downloads](#-direct-downloads).
+1. Download a Windows x64 package from this repository in [Direct Downloads](#-direct-downloads).
 2. Extract the complete portable ZIP and launch the executable. Self-contained builds require no .NET installation or external `WebServer` folder. Close older ScreenTask copies, including the tray instance, before updating.
 3. Select your **Network Interface & Port** (Wi-Fi, Mobile Hotspot, or Ethernet).
 4. Choose your capture source under **Share** (full Display or click **Pick Visually...** to choose a specific application window).
@@ -306,8 +309,12 @@ and an embedded ASP.NET Core server. See [portable packaging details](docs/WINDO
 
 CI prepares the runtime, checks JavaScript, builds, tests and produces a standalone
 artifact. The release workflow packages standalone/framework-dependent editions,
-notices and SHA-256 checksums for explicit `v*` release tags. An ordinary push does
-not publish a release. Generated local EXEs and ZIPs stay in ignored `build/`.
+notices and SHA-256 checksums for explicit `vMAJOR.MINOR.PATCH` release tags. To
+publish an existing tag, run **Actions → Publish GitHub Release → Run workflow**
+from `master` and enter the tag (for example `v2.1.0`). The workflow builds that
+tag's source and checks that its project version matches before publishing.
+An ordinary push does not publish a release. Generated local EXEs and ZIPs stay
+in ignored `build/`. See [release publishing](docs/WINDOWS_PORTABLE.md#publishing-a-github-release).
 Follow [AGENTS.md](AGENTS.md) for repository collaboration and delivery requirements,
 including separate commits for independent requests.
 

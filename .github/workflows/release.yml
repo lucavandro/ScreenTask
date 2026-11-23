@@ -5,6 +5,12 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build and publish (for example v2.1.0)"
+        required: true
+        type: string
+        default: "v2.1.0"
 
 permissions:
   contents: write
@@ -13,10 +19,27 @@ jobs:
   release:
     name: Build, Verify & Publish Release (.NET 9.0)
     runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+
+      - name: Validate release tag and source version
+        shell: pwsh
+        run: |
+          $tag = $env:RELEASE_TAG
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Use an existing MAJOR.MINOR.PATCH release tag, for example v2.1.0."
+          }
+          [xml]$project = Get-Content ScreenTask/ScreenTask.csproj -Raw
+          $version = [string]$project.Project.PropertyGroup.Version
+          if ($tag -ne "v$version") {
+            throw "Release tag $tag does not match source version $version."
+          }
 
       - name: Setup .NET 9.0 SDK
         uses: actions/setup-dotnet@v4
@@ -45,28 +68,31 @@ jobs:
         run: |
           # Release tags use MAJOR.MINOR.PATCH (for example v2.1.0).
           # Legacy v1.2 update checks only recognize shorter tag names.
-          $tag = if ($env:GITHUB_REF_NAME -like "v*") { $env:GITHUB_REF_NAME } else { "v2.0" }
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+          New-Item -ItemType Directory -Force -Path build/release/dist | Out-Null
 
           # 1. Standalone Self-Contained Single-File EXE (Zero .NET runtime install required)
           dotnet publish ScreenTask/ScreenTask.csproj -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false `
-            -o publish/standalone
+            -o build/release/standalone
+          if ($LASTEXITCODE -ne 0) { throw "Standalone publish failed." }
 
-          Copy-Item "publish/standalone/ScreenTask.exe" "dist/ScreenTask-$tag-win-x64-standalone.exe"
-          Copy-Item "publish/standalone/DirectX-NOTICE.txt" "dist/DirectX-NOTICE.txt"
-          Copy-Item "publish/standalone/WebRTC-NOTICE.txt" "dist/WebRTC-NOTICE.txt"
+          Copy-Item "build/release/standalone/ScreenTask.exe" "build/release/dist/ScreenTask-$tag-win-x64-standalone.exe"
+          Copy-Item "build/release/standalone/DirectX-NOTICE.txt" "build/release/dist/DirectX-NOTICE.txt"
+          Copy-Item "build/release/standalone/WebRTC-NOTICE.txt" "build/release/dist/WebRTC-NOTICE.txt"
 
           # 2. Lightweight Framework-Dependent Single-File ZIP (Requires .NET 9 Desktop Runtime)
           dotnet publish ScreenTask/ScreenTask.csproj -c Release -r win-x64 --self-contained false `
             -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false `
-            -o publish/fxdependent
+            -o build/release/fxdependent
+          if ($LASTEXITCODE -ne 0) { throw "Framework-dependent publish failed." }
 
-          Compress-Archive -Path "publish/fxdependent/ScreenTask.exe", "publish/fxdependent/DirectX-NOTICE.txt", "publish/fxdependent/WebRTC-NOTICE.txt", "README.md" `
-            -DestinationPath "dist/ScreenTask-$tag-win-x64-portable.zip" -Force
+          Compress-Archive -Path "build/release/fxdependent/ScreenTask.exe", "build/release/fxdependent/DirectX-NOTICE.txt", "build/release/fxdependent/WebRTC-NOTICE.txt", "README.md" `
+            -DestinationPath "build/release/dist/ScreenTask-$tag-win-x64-portable.zip" -Force
 
           # 3. Generate SHA-256 Checksums
-          Push-Location dist
+          Push-Location build/release/dist
           $lines = @("ScreenTask-$tag-win-x64-standalone.exe", "ScreenTask-$tag-win-x64-portable.zip") | ForEach-Object {
             $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $_"
@@ -79,18 +105,19 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ScreenTask-Release-Packages
-          path: dist/*
+          path: build/release/dist/*
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          name: ScreenTask ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ScreenTask ${{ env.RELEASE_TAG }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
-            dist/ScreenTask-*-win-x64-standalone.exe
-            dist/ScreenTask-*-win-x64-portable.zip
-            dist/SHA256SUMS.txt
-            dist/DirectX-NOTICE.txt
-            dist/WebRTC-NOTICE.txt
+            build/release/dist/ScreenTask-*-win-x64-standalone.exe
+            build/release/dist/ScreenTask-*-win-x64-portable.zip
+            build/release/dist/SHA256SUMS.txt
+            build/release/dist/DirectX-NOTICE.txt
+            build/release/dist/WebRTC-NOTICE.txt
